@@ -39,18 +39,10 @@ const UNIT_DEFS = [
   { id:'fac4',  name:'IRGC FAC-4',      side:'red', type:'fac',             lat:25.14, lng:53.81 },  // wp7 — mid-strait ambush
   { id:'sub1',  name:'IRS GHADIR-881',  side:'red', type:'submarine',       lat:25.58, lng:54.92 },  // wp6 — silent mid-strait
   { id:'mine1', name:'IRGC MINELAYER',  side:'red', type:'minelayer',       lat:26.45, lng:56.25 },  // TSS entry minefield
-  { id:'batt1', name:'NOOR BATTERY',    side:'red', type:'coastal_battery', lat:27.18, lng:56.40 },
-  { id:'batt2', name:'QESHM BATTERY',   side:'red', type:'coastal_battery', lat:26.608, lng:54.734 },
-  { id:'batt3', name:'BANDAR BATTERY',  side:'red', type:'coastal_battery', lat:27.274, lng:52.954 },
-  { id:'batt4', name:'MUSANDAM BATTERY', side:'red', type:'coastal_battery', lat:25.810, lng:57.353 },
 ];
 
 // Threat zones (real geography)
 const THREAT_ZONES_DEF = [
-  { id:'noor',   label:'NOOR BATTERY  C-802 RANGE',   lat:27.18,  lng:56.40, radiusKm:65, color:'#cc2222', level:0.85 },
-  { id:'qeshm',  label:'QESHM BATTERY  C-802 RANGE',  lat:26.608, lng:54.734, radiusKm:65, color:'#cc2222', level:0.80 },
-  { id:'bandar',   label:'BANDAR BATTERY  C-802 RANGE',   lat:27.274, lng:52.954, radiusKm:65, color:'#cc2222', level:0.80 },
-  { id:'musandam', label:'MUSANDAM BATTERY  C-802 RANGE', lat:25.810, lng:57.353, radiusKm:65, color:'#cc2222', level:0.85 },
 ];
 
 // Invisible trigger zones — when blue units enter, IRGC FAC reinforcements spawn
