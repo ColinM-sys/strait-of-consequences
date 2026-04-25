@@ -21,7 +21,9 @@ SCSP Hackathon 2026 — **Wargaming Track**
 
 ## Team
 
-Colin McDonough
+- Colin McDonough
+- Alex Smith
+- Deborah Debeauville
 
 ## Datasets & APIs Used
 
