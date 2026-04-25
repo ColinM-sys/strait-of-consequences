@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>HORMUZ // AI WARGAME</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg:     #060c12;
+      --panel:  rgba(6,12,24,0.96);
+      --border: #1a3a5a;
+      --blue:   #4488cc;
+      --red:    #cc4444;
+      --green:  #44cc88;
+      --text:   #c0d8e8;
+      --dim:    #4a6a7a;
+      --yellow: #ccaa22;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; overflow: hidden; user-select: none; }
+
+    #map {
+      position: fixed; top: 0; left: 0;
+      width: calc(100% - 340px);
+      height: calc(100% - 110px);
+      z-index: 1;
+      outline: none; /* suppress focus ring on map div */
+    }
+
+    /* Airstrike crosshair cursor — overrides Leaflet */
+    #map.airstrike-mode .leaflet-container,
+    #map.airstrike-mode .leaflet-grab,
+    #map.airstrike-mode { cursor: crosshair !important; }
+
+    /* Leaflet attribution minimal */
+    .leaflet-control-attribution { font-size: 9px !important; opacity: 0.4; }
+
+    /* ── BOTTOM ACTION BAR ─────────────────────────────────────── */
+    #action-bar {
+      position: fixed; bottom: 0; left: 0;
+      width: calc(100% - 340px); height: 110px;
+      background: rgba(4,10,20,0.97);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 20px; gap: 10px;
+      z-index: 10;
+      transition: opacity 0.2s;
+    }
+    #action-bar.hidden { opacity: 0.3; pointer-events: none; }
+    #action-bar-label {
+      font-size: 9px; color: var(--dim); letter-spacing: 2px;
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      flex-shrink: 0;
+    }
+    .action-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 5px; padding: 8px 12px;
+      border: 1px solid var(--border); background: transparent;
+      cursor: pointer; transition: all 0.15s;
+      min-width: 100px; height: 82px;
+      font-family: 'Courier New', monospace;
+    }
+    .action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); border-color: currentColor; }
+    .action-btn:disabled { opacity: 0.22; cursor: not-allowed; }
+    .action-btn .btn-icon  { font-size: 20px; }
+    .action-btn .btn-label { font-size: 9px; letter-spacing: 1px; text-align: center; line-height: 1.4; }
+    .action-btn .btn-cost  { font-size: 8px; color: var(--dim); }
+    .action-btn.blue   { color: var(--blue); }
+    .action-btn.green  { color: var(--green); }
+    .action-btn.yellow { color: var(--yellow); }
+    .action-btn.purple { color: #aa66ff; }
+    .action-btn.cyan   { color: #44ffee; }
+    #action-hint { flex:1; text-align:center; font-size:11px; color:var(--dim); letter-spacing:1px; line-height:2; }
+
+    /* ── D-PAD ─────────────────────────────────────────────────── */
+    #dpad { display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; margin-left:6px; }
+    #dpad-row { display:flex; gap:2px; }
+    .dpad-btn {
+      width:32px; height:32px; border:1px solid var(--border); background:transparent;
+      color:var(--text); font-size:14px; cursor:pointer; display:flex; align-items:center;
+      justify-content:center; font-family:'Courier New',monospace; transition:all 0.1s;
+    }
+    .dpad-btn:hover:not(:disabled) { background:rgba(68,136,204,0.18); border-color:var(--blue); }
+    .dpad-btn:active { background:rgba(68,136,204,0.35); }
+    .dpad-btn:disabled { opacity:0.2; cursor:not-allowed; }
+    #dpad-label { font-size:8px; color:var(--dim); letter-spacing:1px; margin-top:2px; }
+
+    /* ── RIGHT PANEL ───────────────────────────────────────────── */
+    #panel {
+      position: fixed; right: 0; top: 0;
+      width: 340px; height: 100vh;
+      background: var(--panel);
+      border-left: 2px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 20;
+    }
+    #panel-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #panel-header h1 { font-size: 24px; letter-spacing: 8px; color: var(--blue); text-shadow: 0 0 20px rgba(68,136,204,0.4); }
+    #panel-header .subtitle { font-size: 12px; color: var(--dim); letter-spacing: 2px; margin-top: 3px; }
+    #panel-tabs { display: flex; border-bottom: 2px solid var(--border); flex-shrink: 0; }
+    .panel-tab { flex: 1; padding: 8px 4px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--dim); font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; cursor: pointer; transition: all 0.15s; }
+    .panel-tab:hover { color: var(--text); }
+    .panel-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    #panel-wargame { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+    #panel-chat { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; padding: 0; }
+    #panel-chat.visible { display: flex; }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-msg { font-size: 12px; line-height: 1.6; font-family: 'Courier New', monospace; }
+    .chat-msg-user { color: #88ccff; align-self: flex-end; background: rgba(68,136,204,0.12); border: 1px solid rgba(68,136,204,0.3); padding: 7px 10px; border-radius: 4px; max-width: 90%; }
+    .chat-msg-ai { color: var(--text); align-self: flex-start; max-width: 100%; }
+    .chat-msg-ai .chat-source { font-size: 10px; color: var(--dim); letter-spacing: 1px; margin-bottom: 4px; }
+    .chat-msg-ai .chat-text { color: #c8dce8; }
+    .chat-msg-ai.streaming .chat-text::after { content: '▌'; animation: blink 0.7s infinite; color: var(--blue); }
+    @keyframes blink { 50% { opacity: 0; } }
+    #chat-input-row { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    #chat-input { flex: 1; background: rgba(20,35,55,0.8); border: 1px solid var(--border); color: var(--text); font-family: 'Courier New', monospace; font-size: 12px; padding: 8px 10px; outline: none; resize: none; height: 52px; border-radius: 2px; }
+    #chat-input:focus { border-color: var(--blue); }
+    #chat-send { background: none; border: 1px solid var(--blue); color: var(--blue); font-family: 'Courier New', monospace; font-size: 11px; padding: 0 12px; cursor: pointer; letter-spacing: 1px; transition: all 0.15s; white-space: nowrap; }
+    #chat-send:hover { background: rgba(68,136,204,0.15); }
+    #chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
+    #chat-context-count { font-size: 10px; color: var(--dim); padding: 0 12px 6px; letter-spacing: 1px; flex-shrink: 0; }
+    #turn-bar { padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    #turn-label { font-size: 13px; color: var(--dim); }
+    #turn-num   { font-size: 18px; color: var(--yellow); font-weight: bold; }
+    #phase-label { margin-left: auto; font-size: 13px; padding: 3px 8px; border: 1px solid currentColor; letter-spacing: 1px; }
+    #phase-label.player { color: var(--green); }
+    #phase-label.ai     { color: var(--red); animation: pulse 0.8s infinite; }
+    #scenario-section { padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #scenario-title   { font-size: 13px; color: var(--yellow); letter-spacing: 3px; margin-bottom: 5px; }
+    #scenario-text    { font-size: 13px; line-height: 1.6; max-height: 90px; overflow-y: auto; }
+    #unit-info  { padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; min-height: 70px; }
+    #unit-name  { font-size: 15px; font-weight: bold; }
+    #unit-name.blue { color: var(--blue); } #unit-name.red { color: var(--red); } #unit-name.none { color: var(--dim); }
+    #unit-stats { font-size: 13px; color: var(--dim); margin-top: 4px; line-height: 1.8; }
+    #move-hint  { font-size: 13px; color: var(--green); margin-top: 4px; }
+    #ai-log { flex:1; overflow-y:auto; padding:10px 16px; display:flex; flex-direction:column; gap:8px; }
+    .log-entry { border-left: 2px solid var(--border); padding: 7px 10px; font-size: 13px; line-height: 1.65; }
+    .log-entry.adjudication { border-color: var(--yellow); }
+    .log-entry.redcell  { border-color: var(--red); background: rgba(180,40,40,0.07); }
+    .log-entry.scenario { border-color: var(--blue); }
+    .log-entry.system   { border-color: var(--dim); }
+    .log-entry.blue     { border-color: var(--blue); }
+    .log-entry.red      { border-color: var(--red); }
+    .log-entry.victory  { border-color: var(--green); background: rgba(68,204,136,0.07); }
+    #btn-demo { color: var(--yellow); border-color: var(--yellow); }
+    #btn-demo:hover:not(:disabled) { background: rgba(204,170,34,0.12); }
+    #btn-demo.running { color: var(--red); border-color: var(--red); animation: pulse 0.8s infinite; }
+    #demo-progress { font-size: 12px; color: var(--dim); letter-spacing: 2px; text-align: center; display: none; margin-top: 2px; }
+    .log-source { font-size: 11px; color: var(--dim); letter-spacing: 2px; margin-bottom: 3px; }
+    .log-text   { color: var(--text); }
+    #controls { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+    button.ctrl {
+      font-family: 'Courier New', monospace; font-size: 13px; letter-spacing: 2px;
+      padding: 10px 12px; border: 1px solid; background: transparent; cursor: pointer; transition: all 0.15s; width: 100%;
+    }
+    #btn-end-turn   { color: var(--green); border-color: var(--green); }
+    #btn-end-turn:hover:not(:disabled)   { background: rgba(68,204,136,0.12); }
+    #btn-end-turn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #btn-new-scenario { color: var(--blue); border-color: var(--blue); }
+    #btn-new-scenario:hover:not(:disabled) { background: rgba(68,136,204,0.12); }
+    #btn-new-scenario:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* HUD */
+    #hud { position: fixed; left: 12px; top: 12px; font-size: 10px; color: rgba(100,160,200,0.7); z-index: 5; pointer-events: none; line-height: 1.9; letter-spacing: 1px; }
+    #legend { position: fixed; left: 12px; bottom: 124px; font-size: 10px; z-index: 5; pointer-events: none; line-height: 2; }
+    #coord-readout { font-size: 10px; color: #44cc88; margin-top: 4px; letter-spacing: 1px; display: none; cursor: pointer; pointer-events: all; }
+    #coord-readout:hover { color: #fff; }
+    #coord-copied { font-size: 9px; color: #44cc88; display: none; margin-top: 2px; }
+    /* ── TRANSIT COUNTER ───────────────────────────────────── */
+    #transit-counter {
+      position: fixed; left: 12px; bottom: 170px; z-index: 5;
+      background: rgba(4,10,20,0.88); border: 1px solid var(--border);
+      padding: 6px 10px; cursor: pointer; font-size: 10px;
+      letter-spacing: 1px; color: var(--dim); transition: all 0.2s;
+    }
+    #transit-counter:hover { border-color: var(--blue); color: var(--text); }
+    #transit-num { font-size: 18px; color: #44ffcc; font-weight: bold; display: block; line-height: 1.2; }
+    #transit-log-panel {
+      display: none; position: fixed; left: 12px; bottom: 220px;
+      width: 310px; background: rgba(4,10,20,0.97); border: 1px solid var(--border);
+      z-index: 30; font-size: 12px; max-height: 360px; overflow-y: auto;
+    }
+    #transit-log-panel.visible { display: block; }
+    .transit-row { padding: 8px 12px; border-bottom: 1px solid rgba(30,50,70,0.6); display: flex; gap: 10px; align-items: center; }
+    .transit-row:last-child { border-bottom: none; }
+    .tr-flag { font-size: 16px; flex-shrink: 0; }
+    .tr-dir-IN  { color: #44cc88; font-size: 11px; letter-spacing: 1px; flex-shrink: 0; }
+    .tr-dir-OUT { color: #44aaff; font-size: 11px; letter-spacing: 1px; flex-shrink: 0; }
+    .tr-name { flex: 1; color: var(--text); font-size: 12px; letter-spacing: 0.5px; }
+    .tr-time { color: var(--dim); font-size: 11px; flex-shrink: 0; }
+
+    #intel-btn {
+      position: fixed; top: 80px; right: 360px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #aa66ff; color: #aa66ff;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #intel-btn:hover { background: rgba(170,102,255,0.15); }
+    #intel-btn.loading { opacity: 0.5; cursor: wait; }
+    #airport-intel-btn {
+      position: fixed; top: 80px; right: 516px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #44ffcc;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.05em;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #airport-intel-btn:hover { background: rgba(68,255,204,0.12); }
+    body.present #airport-intel-btn { right: 596px; }
+    .airport-intel-tip { background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #cce8ff; font-family: monospace; font-size: 12px; }
+    #survey-btn {
+      position: fixed; top: 80px; right: 430px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #ffaa44; color: #ffaa44;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #survey-btn:hover { background: rgba(255,170,68,0.15); }
+    #survey-btn.loading { opacity: 0.5; cursor: wait; }
+    /* Full-screen intel report viewer */
+    #intel-report-overlay {
+      display: none; position: fixed;
+      top: 0; left: 0; right: 340px; bottom: 110px;
+      background: rgba(4,6,14,0.97); z-index: 60;
+      flex-direction: column; font-family: 'Courier New', monospace;
+      border-right: 1px solid #aa66ff;
+    }
+    #intel-report-overlay.visible { display: flex; }
+    #intel-report-header {
+      flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 24px; border-bottom: 1px solid #aa66ff;
+      color: #aa66ff; font-size: 12px; letter-spacing: 3px;
+    }
+    #intel-report-close {
+      background: none; border: 1px solid #aa66ff; color: #aa66ff;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      padding: 5px 16px; cursor: pointer; letter-spacing: 2px;
+    }
+    #intel-report-close:hover { background: rgba(170,102,255,0.15); }
+    #intel-report-body {
+      flex: 1; overflow-y: auto; padding: 28px 36px;
+      color: #c0d8e8; font-size: 14px; line-height: 1.9;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    #intel-report-dismiss-wrap {
+      flex-shrink: 0; padding: 12px 24px; border-top: 1px solid #2a1a1a;
+    }
+    #intel-report-dismiss {
+      background: #1a0a0a; border: 1px solid #cc4444; color: #cc4444;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      padding: 7px 20px; cursor: pointer; letter-spacing: 1px;
+    }
+    #intel-report-dismiss:hover { background: rgba(204,68,68,0.15); }
+
+    #intel-modal {
+      display: none; position: fixed; bottom: 20px; left: 12px;
+      width: 420px; max-width: calc(100vw - 360px);
+      max-height: 340px; overflow: hidden;
+      background: rgba(4,6,16,0.97); border: 1px solid #aa66ff;
+      z-index: 50; font-family: 'Courier New', monospace;
+      box-shadow: 0 0 20px rgba(170,102,255,0.3);
+      display: none; flex-direction: column;
+    }
+    #intel-modal.visible { display: flex; }
+    #intel-modal.collapsed #intel-modal-body,
+    #intel-modal.collapsed #intel-model-cfg { display: none; }
+    #intel-modal-header {
+      flex-shrink: 0;
+      padding: 8px 14px; border-bottom: 1px solid #aa66ff;
+      color: #aa66ff; font-size: 11px; letter-spacing: 2px;
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none;
+    }
+    #intel-modal-header:hover { background: rgba(170,102,255,0.08); }
+    #intel-collapse-icon { font-size: 12px; margin-left: 8px; }
+    #intel-modal-body { flex: 1; overflow-y: auto; padding: 10px 14px; color: #c0d8e8; line-height: 1.5; font-size: 11px; white-space: pre-wrap; word-break: break-word; }
+    #intel-modal-body img { width: 100%; max-height: 100px; object-fit: contain; display: block; margin-bottom: 6px; }
+    #intel-modal-close { cursor: pointer; color: #aa66ff; background: none; border: none; font-size: 16px; font-family: inherit; }
+    #intel-model-cfg { flex-shrink: 0; font-size: 10px; color: #4a6a7a; padding: 4px 14px 6px; border-top: 1px solid #1a3a5a; }
+    body.present #intel-btn { right: 440px; }
+    body.present #survey-btn { right: 510px; }
+
+
+    /* ── SENTINEL PANEL ──────────────────────────────────────── */
+    #sentinel-btn {
+      position: fixed; top: 112px; right: 360px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #33aaff; color: #33aaff;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #sentinel-btn:hover { background: rgba(51,170,255,0.15); }
+    #sentinel-btn.loading { opacity: 0.5; cursor: wait; }
+
+    #sentinel-panel {
+      display: none; position: fixed; inset: 0;
+      background: rgba(2,4,10,0.98); border: none;
+      z-index: 200; font-family: 'Courier New', monospace;
+      flex-direction: column;
+    }
+    #sentinel-panel.visible { display: flex; }
+
+    #sentinel-panel-header {
+      padding: 10px 16px; border-bottom: 1px solid #33aaff;
+      color: #33aaff; font-size: 11px; letter-spacing: 2px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    #sentinel-panel-close { cursor: pointer; background: none; border: none; color: #33aaff; font-size: 18px; font-family: inherit; padding: 0 4px; }
+    #sentinel-status { padding: 6px 16px; color: #4a8aaa; font-size: 11px; flex-shrink: 0; }
+
+    /* Main viewer area */
+    #sentinel-viewer {
+      flex: 1; display: flex; overflow: hidden; position: relative; min-height: 0;
+    }
+
+    /* Compare slider mode */
+    #sentinel-compare {
+      display: none; position: relative; width: 100%; height: 100%; overflow: hidden; cursor: col-resize;
+    }
+    #sentinel-compare.active { display: block; }
+    #sentinel-compare-a { position: absolute; inset: 0; }
+    #sentinel-compare-a img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #sentinel-compare-b {
+      position: absolute; inset: 0; overflow: hidden;
+      clip-path: inset(0 0 0 50%);
+    }
+    #sentinel-compare-b img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #sentinel-compare-divider {
+      position: absolute; top: 0; bottom: 0; width: 3px;
+      background: #33aaff; cursor: col-resize; z-index: 10;
+      box-shadow: 0 0 12px #33aaff;
+    }
+    #sentinel-compare-divider::after {
+      content: '◀ ▶'; position: absolute; top: 50%; transform: translateY(-50%) translateX(-50%);
+      background: #33aaff; color: #000; font-size: 10px; padding: 4px 6px;
+      white-space: nowrap; border-radius: 2px;
+    }
+
+    /* Single image mode */
+    #sentinel-single {
+      display: flex; width: 100%; height: 100%; align-items: center; justify-content: center;
+    }
+    #sentinel-single img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    #sentinel-single.hidden { display: none; }
+
+    /* Analysis overlay */
+    #sentinel-analysis-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(2,4,10,0.88); border-top: 1px solid #1a3a5a;
+      padding: 10px 16px; font-size: 12px; color: #c0d8e8;
+      line-height: 1.6; max-height: 30%; overflow-y: auto;
+      display: none;
+    }
+    #sentinel-analysis-overlay.visible { display: block; }
+
+    /* Thumbnail strip */
+    #sentinel-filmstrip {
+      display: flex; gap: 8px; padding: 10px 16px;
+      border-top: 1px solid #1a3a5a; overflow-x: auto;
+      flex-shrink: 0; background: rgba(2,4,10,0.95);
+      align-items: flex-end;
+    }
+    .sentinel-thumb {
+      flex-shrink: 0; width: 120px; cursor: pointer;
+      border: 2px solid #1a3a5a; background: #020608;
+      transition: border-color 0.15s;
+    }
+    .sentinel-thumb:hover { border-color: #33aaff; }
+    .sentinel-thumb.active { border-color: #33aaff; }
+    .sentinel-thumb.compare-a { border-color: #ffdd00; }
+    .sentinel-thumb.compare-b { border-color: #ff6600; }
+    .sentinel-thumb img { width: 100%; display: block; }
+    .sentinel-thumb-date { font-size: 9px; color: #33aaff; padding: 3px 5px; letter-spacing: 1px; }
+    .sentinel-thumb-analyzing { font-size: 9px; color: #4a6a7a; padding: 0 5px 3px; }
+
+    #sentinel-toolbar {
+      display: flex; gap: 8px; padding: 6px 16px; border-top: 1px solid #1a3a5a;
+      flex-shrink: 0; align-items: center; background: rgba(2,4,10,0.95);
+    }
+    .sentinel-tool-btn {
+      background: transparent; border: 1px solid #1a3a5a; color: #4a8aaa;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 5px 12px; cursor: pointer;
+    }
+    .sentinel-tool-btn:hover { border-color: #33aaff; color: #33aaff; }
+    .sentinel-tool-btn.active { border-color: #33aaff; color: #33aaff; background: rgba(51,170,255,0.1); }
+    #sentinel-compare-hint { font-size: 10px; color: #4a6a7a; margin-left: 8px; }
+    body.present #sentinel-btn { right: 440px; }
+    #paint-toolbar { position: fixed; top: 12px; right: 360px; z-index: 30; display: flex; gap: 6px; align-items: center; }
+    #paint-toolbar button { background: rgba(6,12,24,0.95); border: 1px solid #4a6a7a; color: #4a6a7a; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; padding: 6px 12px; cursor: pointer; }
+    #btn-paint.active          { border-color: #ffdd44; color: #ffdd44; }
+    #btn-paint-boundary.active { border-color: #cc4444; color: #cc4444; }
+    #btn-paint-battery.active  { border-color: #ff6600; color: #ff6600; }
+    #btn-paint-clear           { display: none; }
+    #paint-coords { position: fixed; top: 48px; right: 360px; z-index: 30; background: rgba(6,12,24,0.95); border: 1px solid #ffdd44; color: #ffdd44; font-family: 'Courier New', monospace; font-size: 9px; padding: 4px 10px; max-width: 420px; word-break: break-all; cursor: pointer; display: none; text-align: center; }
+    #paint-coords:hover { color: #fff; }
+
+    /* ── MAP D-PAD (touch/phone controls) ─────────────────────────────── */
+    #map-dpad {
+      position: fixed;
+      right: 360px;
+      bottom: 130px;
+      z-index: 15;
+      display: grid;
+      grid-template-areas: ". u ." "l . r" ". d .";
+      grid-template-columns: 60px 60px 60px;
+      grid-template-rows: 60px 60px 60px;
+      gap: 4px;
+    }
+    .mdp {
+      width: 60px; height: 60px;
+      background: rgba(4,12,24,0.82);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      transition: background 0.1s, border-color 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mdp:active, .mdp.pressed {
+      background: rgba(68,136,204,0.35);
+      border-color: var(--blue);
+    }
+    #mdp-u { grid-area: u; }
+    #mdp-l { grid-area: l; }
+    #mdp-r { grid-area: r; }
+    #mdp-d { grid-area: d; }
+    #map-dpad-label {
+      position: fixed; right: 370px; bottom: 120px;
+      font-size: 8px; color: var(--dim); letter-spacing: 2px;
+      z-index: 15; pointer-events: none; text-align: center; width: 188px;
+    }
+    .lb { color: var(--blue); } .lr { color: var(--red); } .lg { color: var(--green); }
+
+    #loading {
+      position: fixed; top: 45%; left: calc((100% - 340px) / 2);
+      transform: translate(-50%, -50%);
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 18px 32px; font-size: 12px; letter-spacing: 3px;
+      color: var(--blue); z-index: 50; display: none;
+    }
+    #loading.visible { display: block; animation: pulse 0.7s infinite; }
+
+    /* Ship marker styles */
+    .ship-marker { cursor: pointer; transition: transform 0.1s; }
+    .ship-marker:hover { transform: scale(1.15); }
+    .ship-selected { filter: drop-shadow(0 0 6px #ffee00); }
+
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+
+    /* ── GUIDED TOUR NARRATIVE BAR ─────────────────────────────── */
+    #tour-bar {
+      position: fixed;
+      bottom: 110px;
+      left: 0;
+      width: calc(100% - 340px);
+      background: rgba(3, 7, 18, 0.97);
+      border-top: 2px solid #4488cc;
+      border-right: 1px solid var(--border);
+      z-index: 55;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 22px 12px;
+      gap: 8px;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-top-color 0.3s;
+      pointer-events: none;
+      opacity: 0;
+    }
+    #tour-bar.visible {
+      transform: translateY(0);
+      pointer-events: all;
+      opacity: 1;
+    }
+    body.present #tour-bar { width: calc(100% - 420px); bottom: 110px; }
+
+    #tour-top-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+    }
+    #tour-slide-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: #4488cc;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    #tour-slide-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #ffffff;
+      letter-spacing: 2px;
+      flex: 1;
+    }
+    #tour-step-num {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      flex-shrink: 0;
+    }
+    #tour-slide-body {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+    }
+    #tour-bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    #tour-dots {
+      display: flex;
+      gap: 5px;
+      flex: 1;
+    }
+    .tour-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--border);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      flex-shrink: 0;
+    }
+    .tour-dot.active { background: currentColor; transform: scale(1.3); }
+    .tour-dot:hover  { background: #888; }
+    .tour-ctrl {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tour-ctrl:hover { border-color: var(--text); color: var(--text); }
+    #tour-next { color: var(--green); border-color: var(--green); }
+    #tour-next:hover { background: rgba(68,204,136,0.12); }
+    #tour-exit { color: var(--red); border-color: #443333; }
+    #tour-exit:hover { border-color: var(--red); background: rgba(204,68,68,0.1); }
+
+    /* Tour launch button (top bar) */
+    #btn-tour {
+      position: fixed; top: 12px; right: 360px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #ffdd44; color: #ffdd44;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #btn-tour:hover { background: rgba(255,221,68,0.12); }
+    body.present #btn-tour { right: 440px; }
+    .ais-tooltip .leaflet-tooltip { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }
+    .ais-popup .leaflet-popup-content-wrapper { background:#060c12 !important; border:1px solid #2a4a5a !important; border-radius:2px !important; box-shadow:0 0 12px rgba(0,0,0,0.8) !important; padding:0 !important; }
+    .ais-popup .leaflet-popup-content { margin:0 !important; }
+    .ais-popup .leaflet-popup-tip { background:#2a4a5a !important; }
+    .vlm-popup .leaflet-popup-content-wrapper { background:#06080f !important; border:1px solid #aa66ff !important; border-radius:2px !important; box-shadow:0 0 16px rgba(170,102,255,0.3) !important; padding:10px 12px !important; }
+    .vlm-popup .leaflet-popup-content { margin:0 !important; color:#c0d8e8; }
+    .vlm-popup .leaflet-popup-tip { background:#aa66ff !important; }
+    .vlm-popup .leaflet-popup-close-button { color:#aa66ff !important; }
+    @keyframes spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* ── STRATEGIC SITUATION PANEL ────────────────────────────── */
+    #strategic-section { border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+    /* Economic ticker row */
+    #econ-bar { display: flex; border-bottom: 1px solid var(--border); }
+    .econ-item { flex: 1; padding: 7px 8px; border-right: 1px solid var(--border); }
+    .econ-item:last-child { border-right: none; }
+    .econ-label { font-size: 9px; letter-spacing: 1px; color: var(--dim); display: block; }
+    .econ-value { font-size: 16px; font-weight: bold; display: block; line-height: 1.3; }
+    .econ-sub   { font-size: 10px; color: var(--dim); display: block; }
+    #econ-oil      { color: #ffdd55; }
+    #econ-bpd      { color: #ffaa33; }
+    #econ-insurance{ color: #ff4444; }
+    #econ-closure  { color: #ff4444; }
+
+    /* Escalation ladder */
+    #escalation-ladder { padding: 7px 10px 5px; border-bottom: 1px solid var(--border); }
+    #ladder-header { font-size: 9px; letter-spacing: 2px; color: var(--dim); margin-bottom: 6px; }
+    #ladder-rungs { display: flex; gap: 2px; align-items: center; }
+    .rung {
+      flex: 1; text-align: center; font-size: 9px; letter-spacing: 0.5px;
+      padding: 5px 2px; border: 1px solid var(--border); color: var(--dim);
+      transition: all 0.4s; white-space: nowrap; overflow: hidden;
+    }
+    .rung.past    { border-color: #554400; color: #887733; background: rgba(80,60,0,0.2); }
+    .rung.current { border-color: #ffaa33; color: #ffaa33; background: rgba(255,150,0,0.15);
+                    font-weight: bold; animation: pulse 1.2s infinite; }
+    .rung.war.current { border-color: #ff3333; color: #ff3333; background: rgba(255,0,0,0.15); }
+
+    /* Coalition flags */
+    #coalition-bar { padding: 7px 10px; display: flex; align-items: center; gap: 10px; }
+    #coalition-label { font-size: 9px; letter-spacing: 1px; color: var(--dim); flex-shrink: 0; }
+    .cflag { font-size: 20px; opacity: 0.15; transition: all 0.5s; cursor: default; filter: grayscale(1); }
+    .cflag.active { opacity: 1; filter: grayscale(0); }
+    .cflag.hostile { opacity: 1; filter: grayscale(0) hue-rotate(0deg); animation: pulse 1s infinite; }
+
+    /* ── PRESENTATION MODE ─────────────────────────────────────── */
+    #btn-present {
+      position: fixed; top: 46px; right: 360px; z-index: 30;
+      background: rgba(6,12,24,0.95); border: 1px solid #44cc88; color: #44cc88;
+      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer;
+    }
+    #btn-present:hover { background: rgba(68,204,136,0.15); }
+
+    body.present .econ-value     { font-size: 17px; }
+    body.present .econ-label    { font-size: 9px; }
+    body.present .rung          { font-size: 9px; padding: 5px 3px; }
+    body.present .cflag         { font-size: 22px; }
+    body.present #panel          { width: 420px; }
+    body.present #map            { width: calc(100% - 420px); }
+    body.present #action-bar     { width: calc(100% - 420px); }
+    body.present #panel-header h1 { font-size: 30px; }
+    body.present .subtitle       { font-size: 14px; }
+    body.present #turn-num       { font-size: 24px; }
+    body.present #phase-label    { font-size: 16px; }
+    body.present #scenario-title { font-size: 16px; }
+    body.present #scenario-text  { font-size: 15px; max-height: 110px; }
+    body.present #unit-name      { font-size: 19px; }
+    body.present #unit-stats     { font-size: 15px; }
+    body.present .log-entry      { font-size: 15px; }
+    body.present .log-source     { font-size: 13px; }
+    body.present .stake-value    { font-size: 16px; }
+    body.present .stake-label    { font-size: 10px; }
+    body.present button.ctrl     { font-size: 15px; padding: 13px 12px; }
+    body.present #paint-toolbar  { right: 440px; }
+    body.present #btn-present    { right: 440px; top: 46px; }
+    body.present #map-dpad       { right: 440px; }
+    body.present #transit-counter { font-size: 12px; }
+    body.present #transit-num    { font-size: 22px; }
+  </style>
+</head>
+<body>
+
+<div id="map" tabindex="0"></div>
+<div id="paint-toolbar">
+  <button id="btn-paint">✏ PATH</button>
+  <button id="btn-paint-boundary">⬛ LAND</button>
+  <button id="btn-paint-battery">🔴 BATTERY</button>
+  <button id="btn-paint-clear">✕ CLEAR</button>
+</div>
+<button id="btn-present" title="Toggle presentation mode for big screen">⛶ PRESENT</button>
+<button id="btn-tour" title="Guided demo tour — walks through all features with explanations">▶ GUIDED TOUR</button>
+<button id="airport-intel-btn" title="Toggle AI aircraft counts at all scanned airports">✈ AIR INTEL</button>
+<button id="survey-btn" title="Draw a box over any area — auto-tiles into 3×3 grid and produces a consolidated report">🗺 SURVEY</button>
+<button id="intel-btn" title="Capture current map view and analyze with local VLM">🔭 INTEL</button>
+<button id="sentinel-btn" title="Fetch Sentinel-2 satellite passes for this area (last 10 days)">🛰 SENTINEL</button>
+<div id="sentinel-panel">
+  <div id="sentinel-panel-header">
+    <span>📡 SENTINEL-2 — <span id="sentinel-aoi-label"></span></span>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span id="sentinel-status"></span>
+      <button id="sentinel-panel-close">✕ CLOSE</button>
+    </div>
+  </div>
+  <div id="sentinel-viewer">
+    <div id="sentinel-single"><img id="sentinel-main-img" src="" alt=""></div>
+    <div id="sentinel-compare">
+      <div id="sentinel-compare-a">
+        <img id="sentinel-img-a" src="">
+        <div id="sentinel-label-a" style="position:absolute;top:6px;left:8px;background:rgba(0,0,0,0.65);color:#ffdd66;font-size:11px;font-family:'Courier New',monospace;padding:2px 7px;border-radius:2px;letter-spacing:1px;pointer-events:none;z-index:10"></div>
+      </div>
+      <div id="sentinel-compare-b">
+        <img id="sentinel-img-b" src="">
+        <div id="sentinel-label-b" style="position:absolute;top:6px;right:8px;background:rgba(0,0,0,0.65);color:#a0c8e8;font-size:11px;font-family:'Courier New',monospace;padding:2px 7px;border-radius:2px;letter-spacing:1px;pointer-events:none;z-index:10"></div>
+      </div>
+      <div id="sentinel-compare-divider"></div>
+    </div>
+    <div id="sentinel-analysis-overlay"></div>
+  </div>
+  <div id="sentinel-toolbar">
+    <button class="sentinel-tool-btn active" id="sentinel-btn-single">⬜ SINGLE</button>
+    <button class="sentinel-tool-btn" id="sentinel-btn-compare">◧ COMPARE</button>
+    <button class="sentinel-tool-btn" id="sentinel-btn-analyze">🔍 ANALYZE</button>
+    <span id="sentinel-compare-hint">Click a thumbnail to view · In COMPARE mode click two</span>
+    <!-- Single mode sliders -->
+    <span id="sentinel-sliders-single" style="display:inline-flex;align-items:center;gap:8px;margin-left:12px">
+      <label style="font-size:11px;color:#7788aa">☀ <input type="range" id="sentinel-brightness" min="50" max="200" value="75" style="width:70px;vertical-align:middle"> <span id="sentinel-brightness-val">75%</span></label>
+      <label style="font-size:11px;color:#7788aa">◑ <input type="range" id="sentinel-contrast" min="50" max="200" value="150" style="width:70px;vertical-align:middle"> <span id="sentinel-contrast-val">150%</span></label>
+    </span>
+    <!-- Compare mode sliders — one per pane -->
+    <span id="sentinel-sliders-compare" style="display:none;align-items:center;gap:12px;margin-left:12px">
+      <span style="font-size:10px;color:#ffdd66;letter-spacing:1px">BEFORE</span>
+      <label style="font-size:11px;color:#7788aa">☀ <input type="range" id="cmp-brightness-a" min="50" max="200" value="75" style="width:60px;vertical-align:middle"></label>
+      <label style="font-size:11px;color:#7788aa">◑ <input type="range" id="cmp-contrast-a"   min="50" max="200" value="150" style="width:60px;vertical-align:middle"></label>
+      <span style="font-size:10px;color:#ffdd66;letter-spacing:1px;margin-left:8px">AFTER</span>
+      <label style="font-size:11px;color:#7788aa">☀ <input type="range" id="cmp-brightness-b" min="50" max="200" value="75" style="width:60px;vertical-align:middle"></label>
+      <label style="font-size:11px;color:#7788aa">◑ <input type="range" id="cmp-contrast-b"   min="50" max="200" value="150" style="width:60px;vertical-align:middle"></label>
+    </span>
+  </div>
+  <div id="sentinel-filmstrip"></div>
+</div>
+<div id="intel-report-overlay">
+  <div id="intel-report-header">
+    <span id="intel-report-title">INTEL REPORT</span>
+    <button id="intel-report-close">✕ CLOSE</button>
+  </div>
+  <div id="intel-report-body"></div>
+  <div id="intel-report-dismiss-wrap">
+    <button id="intel-report-dismiss">✕ DISMISS REPORT — REMOVE FROM MAP</button>
+  </div>
+</div>
+<div id="intel-modal">
+  <div id="intel-modal-header">
+    <span>VLM INTEL ANALYSIS <span id="intel-collapse-icon">▼</span></span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="intel-modal-copy" title="Copy analysis text" style="background:none;border:1px solid #4a2a6a;color:#aa66ff;font-family:'Courier New',monospace;font-size:10px;padding:3px 8px;cursor:pointer;letter-spacing:1px">⎘ COPY</button>
+      <button id="intel-modal-close">✕</button>
+    </div>
+  </div>
+  <div id="intel-modal-body">Awaiting capture...</div>
+  <div id="intel-model-cfg">MODEL: <span id="intel-model-name">llava</span> · <span id="intel-coords-display"></span></div>
+</div>
+<div id="paint-coords" title="tap to copy"></div>
+
+<div id="hud">
+  <div>STRAIT OF HORMUZ  26.5°N  56.5°E</div>
+  <div>APR 2026 // DAY 51 // CEASEFIRE EXPIRING</div>
+  <div>SCROLL: zoom  •  DRAG: pan  •  CLICK ship: select</div>
+</div>
+
+<div id="legend">
+  <div class="lb">▶ US NAVY (YOU)</div>
+  <div class="lr">▶ IRGC (AI RED CELL)</div>
+  <div class="lg">▬ TSS SAFE CORRIDOR</div>
+  <div id="coord-readout" title="tap to copy"></div>
+  <div id="coord-copied">✓ COPIED</div>
+</div>
+
+<div id="transit-counter" title="Strait transits this session — click for log">
+  <span id="transit-num">0</span>
+  STRAIT TRANSITS
+</div>
+<div id="transit-log-panel"></div>
+
+<div id="action-bar" class="hidden">
+  <div id="action-bar-label">ACTIONS</div>
+  <button class="action-btn blue"   id="act-move">       <span class="btn-icon">↗</span><span class="btn-label">MOVE</span>       <span class="btn-cost">click water</span></button>
+  <button class="action-btn yellow" id="act-air-cover" style="display:none">  <span class="btn-icon">✈</span><span class="btn-label">AIR COVER</span>   <span class="btn-cost">2 turns</span></button>
+  <button class="action-btn cyan"   id="act-ciws"      style="display:none">  <span class="btn-icon">⚡</span><span class="btn-label">CIWS</span>        <span class="btn-cost">1 turn</span></button>
+  <button class="action-btn purple" id="act-ew-jam"    style="display:none">  <span class="btn-icon">📡</span><span class="btn-label">EW JAMMING</span> <span class="btn-cost">2 turns</span></button>
+  <button class="action-btn green"  id="act-mine-sweep"style="display:none">  <span class="btn-icon">🔻</span><span class="btn-label">SWEEP MINES</span><span class="btn-cost">10nm</span></button>
+  <button class="action-btn yellow" id="act-airstrike" style="display:none">  <span class="btn-icon">🎯</span><span class="btn-label">AIR STRIKE</span> <span class="btn-cost">click target</span></button>
+  <button class="action-btn purple" id="act-sigint"    style="display:none">  <span class="btn-icon">📻</span><span class="btn-label">KILL RADAR</span> <span class="btn-cost">disables battery</span></button>
+  <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
+  <div id="dpad">
+    <div id="dpad-row">
+      <button class="dpad-btn" id="dp-ul" title="NW">↖</button>
+      <button class="dpad-btn" id="dp-up" title="N">▲</button>
+      <button class="dpad-btn" id="dp-ur" title="NE">↗</button>
+    </div>
+    <div id="dpad-row">
+      <button class="dpad-btn" id="dp-left"  title="W">◀</button>
+      <button class="dpad-btn" id="dp-down"  title="S">▼</button>
+      <button class="dpad-btn" id="dp-right" title="E">▶</button>
+    </div>
+    <div id="dpad-row">
+      <button class="dpad-btn" id="dp-dl" title="SW">↙</button>
+      <button class="dpad-btn" id="dp-x"  title="center" style="visibility:hidden"></button>
+      <button class="dpad-btn" id="dp-dr" title="SE">↘</button>
+    </div>
+    <div id="dpad-label">MOVE</div>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="panel-header"><h1>HORMUZ</h1><div class="subtitle">AI WARGAME // STRAIT OF HORMUZ // 2026</div></div>
+  <div id="panel-tabs">
+    <button class="panel-tab active" id="tab-wargame">⚔ WARGAME</button>
+    <button class="panel-tab" id="tab-chat">💬 INTEL CHAT</button>
+  </div>
+  <div id="panel-wargame">
+  <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
+  <div id="strategic-section">
+    <div id="econ-bar">
+      <div class="econ-item">
+        <span class="econ-label">OIL AT RISK</span>
+        <span class="econ-value" id="econ-oil">21%</span>
+        <span class="econ-sub" id="econ-bpd">18.5M BPD</span>
+      </div>
+      <div class="econ-item">
+        <span class="econ-label">WAR RISK INS.</span>
+        <span class="econ-value" id="econ-insurance">SUSPENDED</span>
+        <span class="econ-sub">LLOYD'S APR 18</span>
+      </div>
+      <div class="econ-item">
+        <span class="econ-label">IRAN CLOSURE</span>
+        <span class="econ-value" id="econ-closure">CLOSED</span>
+        <span class="econ-sub">ENFORCED APR 18</span>
+      </div>
+    </div>
+    <div id="escalation-ladder">
+      <div id="ladder-header">ESCALATION LADDER</div>
+      <div id="ladder-rungs">
+        <div class="rung current" data-lvl="0">HARASS</div>
+        <div class="rung" data-lvl="1">SEIZURE</div>
+        <div class="rung" data-lvl="2">MINING</div>
+        <div class="rung" data-lvl="3">STRIKE</div>
+        <div class="rung" data-lvl="4">CLOSURE</div>
+        <div class="rung war" data-lvl="5">WAR</div>
+      </div>
+    </div>
+    <div id="coalition-bar">
+      <span id="coalition-label">COALITION</span>
+      <span class="cflag" id="cf-uk"  title="UK Royal Navy escorts activated">🇬🇧</span>
+      <span class="cflag" id="cf-fr"  title="France Marine Nationale deploys">🇫🇷</span>
+      <span class="cflag" id="cf-sa"  title="Saudi Arabia pipeline bypass active">🇸🇦</span>
+      <span class="cflag" id="cf-un"  title="UN Security Council emergency session">🇺🇳</span>
+      <span class="cflag hostile" id="cf-cn" title="China demands unimpeded passage">🇨🇳</span>
+    </div>
+  </div>
+  <div id="scenario-section"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
+  <div id="unit-info"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
+  <div id="ai-log">
+    <div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Click a blue unit to select it, then click anywhere on the water to move it. Hit END TURN to trigger AI adjudication and IRGC response.</div></div>
+  </div>
+  <div id="controls">
+    <button class="ctrl" id="btn-demo">▶▶ DEMO — WATCH FULL OPERATION</button>
+    <div id="demo-progress"></div>
+    <button class="ctrl" id="btn-end-turn">▶ END TURN / COMMIT MOVES</button>
+    <button class="ctrl" id="btn-new-scenario">↺ GENERATE NEW SCENARIO</button>
+  </div>
+  </div><!-- end #panel-wargame -->
+  <div id="panel-chat">
+    <div id="chat-messages">
+      <div class="chat-msg chat-msg-ai">
+        <div class="chat-source">INTEL CHAT // RAG-GROUNDED // LOCAL AI</div>
+        <div class="chat-text">Ask anything about the Strait of Hormuz — Iranian order of battle, IRGC tactics, mine warfare, tanker operations, escalation dynamics, or US/coalition force posture. Answers drawn from classified-style intel database.</div>
+      </div>
+    </div>
+    <div id="chat-context-count"></div>
+    <div id="chat-input-row">
+      <textarea id="chat-input" placeholder="Ask about IRGC capabilities, tanker tactics, escalation..."></textarea>
+      <button id="chat-send">SEND</button>
+    </div>
+  </div>
+</div>
+
+<div id="map-dpad">
+  <button class="mdp" id="mdp-u">▲</button>
+  <button class="mdp" id="mdp-l">◀</button>
+  <button class="mdp" id="mdp-r">▶</button>
+  <button class="mdp" id="mdp-d">▼</button>
+</div>
+<div id="map-dpad-label">STEER SHIP</div>
+
+<div id="loading">⬛ AI PROCESSING...</div>
+
+<!-- Guided Tour Narrative Bar -->
+<div id="tour-bar">
+  <div id="tour-top-row">
+    <span id="tour-slide-label">INTRODUCTION</span>
+    <span id="tour-slide-title">HORMUZ // AI WARGAME</span>
+    <span id="tour-step-num">1 / 12</span>
+  </div>
+  <div id="tour-slide-body">Loading...</div>
+  <div id="tour-bottom-row">
+    <div id="tour-dots"></div>
+    <button class="tour-ctrl" id="tour-prev">◀ PREV</button>
+    <button class="tour-ctrl" id="tour-next">NEXT ▶</button>
+    <button class="tour-ctrl" id="tour-exit">✕ EXIT TOUR</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js?v=63"></script>
+</body>
+</html>

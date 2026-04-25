@@ -1,0 +1,6 @@
+api/.env
+__pycache__/
+*.pyc
+.DS_Store
+api/*.jpg
+api/*.png
