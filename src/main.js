@@ -320,23 +320,143 @@ const _aisVessels = new Map(); // mmsi → { marker, label, lat, lng }
 // COG 0=N 90=E 180=S 270=W  |  sog in knots
 const SIM_VESSELS = [
   // ── Eastbound (outbound, heading SE toward Gulf of Oman) ──
-  { mmsi: 477001234, name: 'ALPINE CONFIDENCE', flag: '🇭🇰', type: 80, lat: 26.34, lng: 56.22, cog: 112, sog: 12.4 },
-  { mmsi: 564123456, name: 'OLYMPIC SPIRIT',    flag: '🇸🇬', type: 70, lat: 25.85, lng: 57.10, cog: 118, sog: 11.2 },
-  { mmsi: 636091234, name: 'STENA SUEDE',       flag: '🇱🇷', type: 80, lat: 25.80, lng: 56.88, cog: 122, sog: 10.8 },
-  { mmsi: 229045678, name: 'MAERSK HONAM',      flag: '🇲🇹', type: 70, lat: 24.72, lng: 58.52, cog: 128, sog: 13.1 },
-  { mmsi: 311023456, name: 'BAHRI JEDDAH',      flag: '🇧🇸', type: 80, lat: 26.08, lng: 55.68, cog: 108, sog: 11.5 },
-  { mmsi: 477234567, name: 'NISSOS KEROS',      flag: '🇭🇰', type: 80, lat: 25.62, lng: 58.10, cog: 115, sog: 10.1 },
+  { mmsi: 477001234, name: 'ALPINE CONFIDENCE', flag: '🇭🇰', type: 80, lat: 26.34, lng: 56.22, cog: 112, sog: 12.4,
+    cargo: 'Saudi crude · 2.1M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ningbo, China',
+    interests: [
+      { c:'🇨🇳 China',        s: 96, r: 'Primary buyer — 2.1M bbl Aramco crude' },
+      { c:'🇸🇦 Saudi Arabia', s: 90, r: 'Aramco export revenue, regional influence' },
+      { c:'🇯🇵 Japan',        s: 62, r: 'Competing buyer, corridor reliability' },
+      { c:'🇰🇷 South Korea',  s: 58, r: 'Refinery supply chain exposure' },
+      { c:'🇺🇸 USA',          s: 44, r: 'Ally stability, oil price floor' },
+    ]},
+  { mmsi: 564123456, name: 'OLYMPIC SPIRIT',    flag: '🇸🇬', type: 70, lat: 25.85, lng: 57.10, cog: 118, sog: 11.2,
+    cargo: 'Container goods · 8,200 TEU', origin: 'Jebel Ali, UAE', dest: 'Singapore / Tanjung Pelepas',
+    interests: [
+      { c:'🇸🇬 Singapore',    s: 88, r: 'Transshipment hub — direct port call' },
+      { c:'🇦🇪 UAE',          s: 80, r: 'Jebel Ali exports, re-export trade' },
+      { c:'🇮🇳 India',        s: 65, r: 'Manufacturing goods in mixed load' },
+      { c:'🇲🇾 Malaysia',     s: 55, r: 'Onward distribution hub' },
+      { c:'🇪🇺 EU',           s: 48, r: 'European branded goods in transit' },
+    ]},
+  { mmsi: 636091234, name: 'STENA SUEDE',       flag: '🇱🇷', type: 80, lat: 25.80, lng: 56.88, cog: 122, sog: 10.8,
+    cargo: 'Iraqi crude · 1.8M bbl', origin: 'Basra, Iraq', dest: 'Rotterdam, Netherlands',
+    interests: [
+      { c:'🇪🇺 EU',           s: 92, r: 'Critical crude supply to European refineries' },
+      { c:'🇮🇶 Iraq',         s: 88, r: '90% of govt revenue from oil exports' },
+      { c:'🇩🇪 Germany',      s: 82, r: 'Largest EU refinery consumer of Basra light' },
+      { c:'🇮🇹 Italy',        s: 74, r: 'ENI refinery contracts, Basra crude dependency' },
+      { c:'🇳🇱 Netherlands',  s: 70, r: 'Rotterdam — primary EU crude landing hub' },
+    ]},
+  { mmsi: 229045678, name: 'MAERSK HONAM',      flag: '🇲🇹', type: 70, lat: 24.72, lng: 58.52, cog: 128, sog: 13.1,
+    cargo: 'Mixed container · 15,200 TEU', origin: 'Mumbai / Nhava Sheva, India', dest: 'Hamburg, Germany',
+    interests: [
+      { c:'🇩🇪 Germany',      s: 80, r: 'Major importer of Indian manufactured goods' },
+      { c:'🇮🇳 India',        s: 78, r: 'Textiles, pharma, auto parts export revenue' },
+      { c:'🇩🇰 Denmark',      s: 70, r: 'Maersk HQ — fleet revenue and schedule' },
+      { c:'🇪🇺 EU',           s: 68, r: 'Supply chain for multiple EU importers' },
+      { c:'🇬🇧 UK',           s: 52, r: 'Portion of cargo destined for Felixstowe' },
+    ]},
+  { mmsi: 311023456, name: 'BAHRI JEDDAH',      flag: '🇧🇸', type: 80, lat: 26.08, lng: 55.68, cog: 108, sog: 11.5,
+    cargo: 'Saudi Aramco crude · 2.3M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ulsan, South Korea',
+    interests: [
+      { c:'🇸🇦 Saudi Arabia', s: 96, r: 'State-owned Bahri tanker — Aramco export' },
+      { c:'🇰🇷 South Korea',  s: 94, r: 'Primary buyer — feeds Hyundai/SK refineries' },
+      { c:'🇯🇵 Japan',        s: 70, r: 'Corridor stability for competing cargoes' },
+      { c:'🇺🇸 USA',          s: 55, r: 'Saudi alliance stability, corridor access' },
+      { c:'🇨🇳 China',        s: 45, r: 'Indirect — competing for same crude sources' },
+    ]},
+  { mmsi: 477234567, name: 'NISSOS KEROS',      flag: '🇭🇰', type: 80, lat: 25.62, lng: 58.10, cog: 115, sog: 10.1,
+    cargo: 'Kuwait crude · 1.9M bbl', origin: 'Ahmadi, Kuwait', dest: 'Chiba, Japan',
+    interests: [
+      { c:'🇯🇵 Japan',        s: 95, r: 'Primary buyer — Tokyo Electric/JXTG supply' },
+      { c:'🇰🇼 Kuwait',       s: 88, r: 'KPC export revenue, GDP dependency' },
+      { c:'🇰🇷 South Korea',  s: 68, r: 'Competing Kuwaiti crude buyer' },
+      { c:'🇸🇬 Singapore',    s: 52, r: 'Possible transshipment / blending stop' },
+      { c:'🇬🇧 UK',           s: 44, r: 'BP offtake agreement on Kuwait crude' },
+    ]},
   // ── Westbound (inbound, heading NW into Persian Gulf) ──
-  { mmsi: 538034567, name: 'PACIFIC LAGOON',    flag: '🇲🇭', type: 70, lat: 25.52, lng: 57.78, cog: 292, sog: 12.0 },
-  { mmsi: 477056789, name: 'EURONAV VENUS',     flag: '🇧🇪', type: 80, lat: 25.92, lng: 56.48, cog: 284, sog:  9.8 },
-  { mmsi: 371098765, name: 'GULF TRADER',       flag: '🇵🇦', type: 80, lat: 26.05, lng: 55.42, cog: 278, sog: 10.3 },
-  { mmsi: 636056789, name: 'MSC SARAH',         flag: '🇱🇷', type: 70, lat: 24.22, lng: 59.08, cog: 288, sog: 14.2 },
-  { mmsi: 229087654, name: 'NAVIGATOR AURORA',  flag: '🇬🇷', type: 80, lat: 25.32, lng: 58.18, cog: 298, sog: 11.7 },
-  { mmsi: 338901234, name: 'FURE NORD',         flag: '🇳🇴', type: 80, lat: 26.20, lng: 54.90, cog: 270, sog:  8.9 },
+  { mmsi: 538034567, name: 'PACIFIC LAGOON',    flag: '🇲🇭', type: 70, lat: 25.52, lng: 57.78, cog: 292, sog: 12.0,
+    cargo: 'Auto parts / machinery · 9,000 TEU', origin: 'Colombo, Sri Lanka', dest: 'Jebel Ali, UAE',
+    interests: [
+      { c:'🇦🇪 UAE',          s: 85, r: 'Jebel Ali — primary ME distribution hub' },
+      { c:'🇮🇳 India',        s: 68, r: 'Indian sub-assembly parts in manifest' },
+      { c:'🇱🇰 Sri Lanka',    s: 60, r: 'Port revenue, garment & parts exports' },
+      { c:'🇩🇪 Germany',      s: 55, r: 'German auto OEM parts for ME assembly' },
+      { c:'🇯🇵 Japan',        s: 50, r: 'Toyota/Nissan parts supply to ME plants' },
+    ]},
+  { mmsi: 477056789, name: 'EURONAV VENUS',     flag: '🇧🇪', type: 80, lat: 25.92, lng: 56.48, cog: 284, sog:  9.8,
+    cargo: 'Ballast (loading at Ruwais, UAE)', origin: 'Antwerp, Belgium', dest: 'Ruwais, UAE',
+    interests: [
+      { c:'🇦🇪 UAE',          s: 90, r: 'ADNOC crude export — ship heading to load' },
+      { c:'🇧🇪 Belgium',      s: 82, r: 'Euronav HQ, Antwerp refinery feedstock' },
+      { c:'🇫🇷 France',       s: 75, r: 'TotalEnergies offtake of Murban crude' },
+      { c:'🇩🇪 Germany',      s: 70, r: 'EU crude import dependency' },
+      { c:'🇺🇸 USA',          s: 48, r: 'US ally — corridor freedom of navigation' },
+    ]},
+  { mmsi: 371098765, name: 'GULF TRADER',       flag: '🇵🇦', type: 80, lat: 26.05, lng: 55.42, cog: 278, sog: 10.3,
+    cargo: 'Qatar LNG condensate · 70,000 MT', origin: 'Yokohama, Japan', dest: 'Ras Laffan, Qatar',
+    interests: [
+      { c:'🇶🇦 Qatar',        s: 92, r: 'QatarEnergy export earnings — LNG shipment return' },
+      { c:'🇯🇵 Japan',        s: 88, r: 'LNG supply contracts, energy security' },
+      { c:'🇰🇷 South Korea',  s: 75, r: 'KOGAS long-term LNG contracts with Qatar' },
+      { c:'🇺🇸 USA',          s: 60, r: 'US ally, Qatar hosts Al Udeid Air Base' },
+      { c:'🇬🇧 UK',           s: 52, r: 'Centrica / Shell LNG offtake agreements' },
+    ]},
+  { mmsi: 636056789, name: 'MSC SARAH',         flag: '🇱🇷', type: 70, lat: 24.22, lng: 59.08, cog: 288, sog: 14.2,
+    cargo: 'Consumer goods / food · 12,400 TEU', origin: 'Karachi, Pakistan', dest: 'Gioia Tauro, Italy',
+    interests: [
+      { c:'🇮🇹 Italy',        s: 80, r: 'Gioia Tauro hub — primary EU landing' },
+      { c:'🇵🇰 Pakistan',     s: 78, r: 'Textile, rice, and industrial exports' },
+      { c:'🇨🇭 Switzerland',  s: 68, r: 'MSC HQ — vessel revenue and schedule' },
+      { c:'🇪🇺 EU',           s: 65, r: 'Consumer goods distribution across EU' },
+      { c:'🇬🇷 Greece',       s: 48, r: 'Transshipment calls at Piraeus' },
+    ]},
+  { mmsi: 229087654, name: 'NAVIGATOR AURORA',  flag: '🇬🇷', type: 80, lat: 25.32, lng: 58.18, cog: 298, sog: 11.7,
+    cargo: 'Saudi LPG · 70,000 MT', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
+    interests: [
+      { c:'🇸🇦 Saudi Arabia', s: 88, r: 'Saudi Aramco LPG export — vessel returning to load' },
+      { c:'🇯🇵 Japan',        s: 85, r: 'LPG for residential/industrial fuel' },
+      { c:'🇮🇳 India',        s: 72, r: 'Competing LPG buyer from Saudi' },
+      { c:'🇰🇷 South Korea',  s: 65, r: 'LPG for petrochemical feedstock' },
+      { c:'🇨🇳 China',        s: 58, r: 'Growing LPG import demand from Arabia' },
+    ]},
+  { mmsi: 338901234, name: 'FURE NORD',         flag: '🇳🇴', type: 80, lat: 26.20, lng: 54.90, cog: 270, sog:  8.9,
+    cargo: 'Methanol · 32,000 MT', origin: 'Rotterdam, Netherlands', dest: 'Jubail, Saudi Arabia',
+    interests: [
+      { c:'🇸🇦 Saudi Arabia', s: 86, r: 'SABIC industrial feedstock import' },
+      { c:'🇳🇱 Netherlands',  s: 72, r: 'Chemical export revenue from Rotterdam' },
+      { c:'🇳🇴 Norway',       s: 65, r: 'Fure fleet — shipping revenue' },
+      { c:'🇩🇪 Germany',      s: 60, r: 'BASF / chemical supply chain exposure' },
+      { c:'🇺🇸 USA',          s: 42, r: 'US chemical industry competing exports' },
+    ]},
   // ── Slow / anchored near Fujairah / Khor Fakkan ──
-  { mmsi: 303012345, name: 'DELTA NAVIGATOR',   flag: '🇺🇸', type: 70, lat: 25.11, lng: 56.38, cog: 180, sog:  0.3 },
-  { mmsi: 538090123, name: 'OCEAN TRIUMPH',     flag: '🇲🇭', type: 80, lat: 25.07, lng: 57.12, cog:   0, sog:  0.1 },
-  { mmsi: 413012345, name: 'HONG FA',           flag: '🇨🇳', type: 70, lat: 24.95, lng: 57.45, cog:  45, sog:  1.2 },
+  { mmsi: 303012345, name: 'DELTA NAVIGATOR',   flag: '🇺🇸', type: 70, lat: 25.11, lng: 56.38, cog: 180, sog:  0.3,
+    cargo: 'US Military logistics · classified', origin: 'Norfolk, VA (via Suez)', dest: 'Diego Garcia / 5th Fleet',
+    interests: [
+      { c:'🇺🇸 USA',          s: 98, r: 'US Navy / TRANSCOM logistics — mission critical' },
+      { c:'🇬🇧 UK',           s: 78, r: 'Diego Garcia base shared with UK' },
+      { c:'🇦🇺 Australia',    s: 62, r: 'Five Eyes partner, Indo-Pacific stability' },
+      { c:'🇯🇵 Japan',        s: 55, r: 'US forward presence stabilises Japan security' },
+      { c:'🇮🇳 India',        s: 40, r: 'Quad partner — indirect security interest' },
+    ]},
+  { mmsi: 538090123, name: 'OCEAN TRIUMPH',     flag: '🇲🇭', type: 80, lat: 25.07, lng: 57.12, cog:   0, sog:  0.1,
+    cargo: 'Omani crude · 2.2M bbl (anchored, awaiting clearance)', origin: 'Mina al Fahal, Oman', dest: 'Zhoushan, China',
+    interests: [
+      { c:'🇨🇳 China',        s: 96, r: 'Buyer — Zhoushan SPR fill, refinery feed' },
+      { c:'🇴🇲 Oman',         s: 88, r: 'PDO export revenue — ship anchored since closure' },
+      { c:'🇰🇷 South Korea',  s: 50, r: 'Competing buyer of Omani crude' },
+      { c:'🇮🇳 India',        s: 48, r: 'Competing Oman crude buyer' },
+      { c:'🇺🇸 USA',          s: 30, r: 'Monitoring Chinese energy imports' },
+    ]},
+  { mmsi: 413012345, name: 'HONG FA',           flag: '🇨🇳', type: 70, lat: 24.95, lng: 57.45, cog:  45, sog:  1.2,
+    cargo: 'Chinese manufactured goods · 10,800 TEU', origin: 'Tianjin, China', dest: 'Jebel Ali, UAE',
+    interests: [
+      { c:'🇨🇳 China',        s: 94, r: 'State-flagged — BRI trade corridor exports' },
+      { c:'🇦🇪 UAE',          s: 80, r: 'Chinese goods for ME distribution & re-export' },
+      { c:'🇸🇦 Saudi Arabia', s: 62, r: 'Chinese investment goods for Vision 2030 projects' },
+      { c:'🇵🇰 Pakistan',     s: 58, r: 'CPEC goods transiting to Pakistan' },
+      { c:'🇪🇺 EU',           s: 45, r: 'European goods in Chinese containers (reverse flow)' },
+    ]},
 ];
 
 function _aisIcon(shipType, flag, cogDeg = 90) {
@@ -470,15 +590,37 @@ function _startAIS() {
       interactive: false, zIndexOffset: -200,
     }).addTo(map);
 
-    const makePopup = () =>
-      `<div style="font-family:Courier New;font-size:12px;color:#c0d8e8;background:#060c12;border:1px solid #2a4a5a;padding:8px 12px;line-height:1.9;min-width:180px">
-        <b style="color:#fff;font-size:13px">${v.flag} ${v.name}</b><br>
-        <span style="color:#4a6a7a">TYPE</span>  ${v.type >= 80 ? 'TANKER / VLCC' : 'CARGO / CONTAINER'}<br>
-        <span style="color:#4a6a7a">SPEED</span> ${v.sog.toFixed(1)} kn<br>
-        <span style="color:#4a6a7a">COURSE</span> ${Math.round(v.cog)}° · ${v._navDir > 0 ? 'INBOUND → PG' : 'OUTBOUND → GOO'}<br>
-        <span style="color:#4a6a7a">MMSI</span> ${v.mmsi}<br>
-        <span style="color:#4a6a7a">STATUS</span> <span style="color:#44cc88">UNDERWAY</span>
+    const makePopup = () => {
+      const isBars = v.interests && v.interests.length;
+      const bars = isBars ? v.interests.map(i => {
+        const col = i.s >= 80 ? '#ff8833' : i.s >= 60 ? '#ffdd44' : '#44aacc';
+        return `<div style="margin:3px 0">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:1px">
+            <span style="color:#c0d8e8">${i.c}</span>
+            <span style="color:${col};font-weight:bold">${i.s}</span>
+          </div>
+          <div style="background:#0d1e2a;border-radius:2px;height:5px;width:100%">
+            <div style="background:${col};width:${i.s}%;height:5px;border-radius:2px"></div>
+          </div>
+          <div style="font-size:9px;color:#4a6a8a;margin-top:1px">${i.r}</div>
+        </div>`;
+      }).join('') : '';
+      return `<div style="font-family:Courier New;font-size:11px;color:#c0d8e8;background:#060c12;border:1px solid #2a4a5a;padding:10px 13px;line-height:1.8;min-width:260px;max-width:300px">
+        <div style="color:#fff;font-size:13px;font-weight:bold;margin-bottom:5px">${v.flag} ${v.name}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin-bottom:6px">
+          <span style="color:#4a6a7a">TYPE</span><span>${v.type >= 80 ? 'TANKER / VLCC' : 'CARGO / CONTAINER'}</span>
+          <span style="color:#4a6a7a">CARGO</span><span style="color:#ffe080">${v.cargo ?? '—'}</span>
+          <span style="color:#4a6a7a">FROM</span><span>${v.origin ?? '—'}</span>
+          <span style="color:#4a6a7a">TO</span><span>${v.dest ?? '—'}</span>
+          <span style="color:#4a6a7a">SPEED</span><span>${v.sog.toFixed(1)} kn · ${v._navDir > 0 ? 'INBOUND' : 'OUTBOUND'}</span>
+          <span style="color:#4a6a7a">MMSI</span><span style="color:#4a6a7a">${v.mmsi}</span>
+        </div>
+        ${isBars ? `<div style="border-top:1px solid #1a3a4a;padding-top:7px;margin-top:2px">
+          <div style="font-size:9px;letter-spacing:1px;color:#4a7a9a;margin-bottom:5px">STAKEHOLDER INTEREST IN SAFE PASSAGE (0–100)</div>
+          ${bars}
+        </div>` : ''}
       </div>`;
+    };
 
     marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 240, closeButton: true });
     _aisVessels.set(v.mmsi, { marker, label, v, makePopup });
