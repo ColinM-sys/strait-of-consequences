@@ -1995,19 +1995,21 @@ const CHAT_RAG  = 'http://localhost:8001/intel/query';
 const CHAT_LLM  = 'http://localhost:11434/api/generate';
 const CHAT_MODEL = 'llama3.1:8b';
 
-document.getElementById('tab-wargame').addEventListener('click', () => {
-  document.getElementById('tab-wargame').classList.add('active');
-  document.getElementById('tab-chat').classList.remove('active');
-  document.getElementById('panel-wargame').style.display = 'flex';
-  document.getElementById('panel-chat').classList.remove('visible');
-});
-document.getElementById('tab-chat').addEventListener('click', () => {
-  document.getElementById('tab-chat').classList.add('active');
-  document.getElementById('tab-wargame').classList.remove('active');
-  document.getElementById('panel-wargame').style.display = 'none';
-  document.getElementById('panel-chat').classList.add('visible');
-  document.getElementById('chat-input').focus();
-});
+function _showTab(name) {
+  ['wargame','chat','markets'].forEach(t => {
+    document.getElementById(`tab-${t}`)?.classList.remove('active');
+    if (t === 'wargame') document.getElementById('panel-wargame').style.display = 'none';
+    else document.getElementById(`panel-${t}`)?.classList.remove('visible');
+  });
+  document.getElementById(`tab-${name}`)?.classList.add('active');
+  if (name === 'wargame') document.getElementById('panel-wargame').style.display = 'flex';
+  else document.getElementById(`panel-${name}`)?.classList.add('visible');
+  if (name === 'chat') document.getElementById('chat-input')?.focus();
+}
+document.getElementById('tab-wargame').addEventListener('click', () => _showTab('wargame'));
+document.getElementById('tab-chat').addEventListener('click',    () => _showTab('chat'));
+document.getElementById('tab-markets').addEventListener('click', () => _showTab('markets'));
+_showTab('wargame');
 
 async function _chatSend() {
   const input = document.getElementById('chat-input');

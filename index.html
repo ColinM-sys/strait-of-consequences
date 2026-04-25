@@ -110,6 +110,24 @@
     #panel-wargame { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
     #panel-chat { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; padding: 0; }
     #panel-chat.visible { display: flex; }
+    #panel-markets { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
+    #panel-markets.visible { display: flex; }
+    .mkt-header { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-bottom: 2px; }
+    .mkt-price { font-size: 28px; letter-spacing: 2px; color: #ffdd55; font-weight: bold; }
+    .mkt-sub { font-size: 11px; color: var(--dim); margin-top: 2px; }
+    .mkt-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; }
+    .mkt-row { display: flex; gap: 10px; }
+    .mkt-row .mkt-card { flex: 1; }
+    .mkt-change.up { color: #ff4444; }
+    .mkt-change.dn { color: #44cc88; }
+    .strait-status-bar { background: rgba(255,68,68,0.12); border: 1px solid rgba(255,68,68,0.4); border-radius: 4px; padding: 10px 14px; }
+    .strait-status-label { font-size: 10px; letter-spacing: 2px; color: var(--dim); }
+    .strait-status-val { font-size: 15px; color: #ff4444; font-weight: bold; margin-top: 3px; letter-spacing: 1px; }
+    .mkt-news { font-size: 11px; color: #aabbcc; line-height: 1.6; }
+    .mkt-news-item { border-left: 2px solid var(--border); padding-left: 8px; margin-bottom: 8px; }
+    .mkt-news-item a { color: #88ccff; text-decoration: none; }
+    .mkt-news-item a:hover { text-decoration: underline; }
+    .mkt-news-date { font-size: 9px; color: var(--dim); letter-spacing: 1px; }
     #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
     .chat-msg { font-size: 12px; line-height: 1.6; font-family: 'Courier New', monospace; }
     .chat-msg-user { color: #88ccff; align-self: flex-end; background: rgba(68,136,204,0.12); border: 1px solid rgba(68,136,204,0.3); padding: 7px 10px; border-radius: 4px; max-width: 90%; }
@@ -780,6 +798,7 @@
   <div id="panel-tabs">
     <button class="panel-tab active" id="tab-wargame">⚔ WARGAME</button>
     <button class="panel-tab" id="tab-chat">💬 INTEL CHAT</button>
+    <button class="panel-tab" id="tab-markets">📈 MARKETS</button>
   </div>
   <div id="panel-wargame">
   <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
@@ -833,6 +852,74 @@
     <button class="ctrl" id="btn-new-scenario">↺ GENERATE NEW SCENARIO</button>
   </div>
   </div><!-- end #panel-wargame -->
+  <div id="panel-markets">
+    <div class="strait-status-bar">
+      <div class="strait-status-label">STRAIT OF HORMUZ — CURRENT STATUS</div>
+      <div class="strait-status-val">⛔ EFFECTIVELY CLOSED — DUAL NAVAL BLOCKADE ACTIVE</div>
+      <div class="mkt-sub" style="margin-top:5px">Iran IRGC controlling exits · US Navy controlling entry from Arabian Sea · ~2,000 vessels stranded</div>
+    </div>
+    <div class="mkt-row">
+      <div class="mkt-card">
+        <div class="mkt-header">BRENT CRUDE</div>
+        <div class="mkt-price" id="mkt-brent">$105.30</div>
+        <div class="mkt-sub"><span class="mkt-change up" id="mkt-brent-chg">+73% YTD</span> · Peak $126 (Mar 8)</div>
+      </div>
+      <div class="mkt-card">
+        <div class="mkt-header">WTI CRUDE</div>
+        <div class="mkt-price" id="mkt-wti">$101.40</div>
+        <div class="mkt-sub"><span class="mkt-change up">+16% THIS WEEK</span> · Apr 24 close</div>
+      </div>
+    </div>
+    <div class="mkt-card">
+      <div class="mkt-header">LIVE BRENT CRUDE (TRADINGVIEW)</div>
+      <div style="margin-top:8px">
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+          {
+            "symbol": "UKOIL",
+            "width": "100%",
+            "height": "200",
+            "locale": "en",
+            "dateRange": "1M",
+            "colorTheme": "dark",
+            "isTransparent": true,
+            "autosize": true
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+    <div class="mkt-card">
+      <div class="mkt-header">LATEST HEADLINES</div>
+      <div class="mkt-news" style="margin-top:8px">
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 24 2026</div>
+          <a href="https://www.thenationalnews.com/business/markets/2026/04/24/oil-prices-iran-war/" target="_blank">Oil posts sharp 16% weekly gain amid simmering Strait of Hormuz tensions</a>
+        </div>
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 23 2026</div>
+          <a href="https://www.axios.com/2026/04/23/iran-strait-hormuz-mines-trump" target="_blank">Iran deploys more mines in the Strait of Hormuz — Axios</a>
+        </div>
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 23 2026</div>
+          <a href="https://www.cnbc.com/2026/04/23/iran-war-strait-hormuz-tanker-traffic-oil.html" target="_blank">US-Iran war evolves into naval standoff · VLCC traffic near zero — CNBC</a>
+        </div>
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 22 2026</div>
+          <a href="https://www.cnbc.com/2026/04/22/iran-war-strait-hormuz-tanker-ship-trump-blockade.html" target="_blank">Strait remains basically closed as Iran seizes MSC Francesca, Epaminondas — CNBC</a>
+        </div>
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 19 2026</div>
+          <a href="https://windward.ai/blog/april-19-2026-iran-war-maritime-intelligence-daily/" target="_blank">Maritime Intelligence Daily: ~20,000 mariners stranded in Persian Gulf — Windward AI</a>
+        </div>
+        <div class="mkt-news-item">
+          <div class="mkt-news-date">APR 18 2026</div>
+          <a href="https://www.cnbc.com/amp/2026/04/20/oil-claws-back-losses-as-strait-of-hormuz-is-closed-again.html" target="_blank">Iran closes Strait of Hormuz again after US extends ceasefire — CNBC</a>
+        </div>
+      </div>
+    </div>
+  </div><!-- end #panel-markets -->
   <div id="panel-chat">
     <div id="chat-messages">
       <div class="chat-msg chat-msg-ai">
@@ -874,6 +961,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=64"></script>
+<script type="module" src="src/main.js?v=65"></script>
 </body>
 </html>
