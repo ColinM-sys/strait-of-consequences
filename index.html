@@ -986,15 +986,39 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=157"></script>
-<script src="src/infra-layer.js?v=157"></script>
-<script src="src/ship-taxonomy.js?v=157"></script>
-<script src="src/scenarios.js?v=157"></script>
-<script src="src/routes.js?v=157"></script>
-<script src="src/exercise.js?v=157"></script>
-<script src="src/exercise-ui.js?v=157"></script>
-<script src="src/routes-ui.js?v=157"></script>
-<script type="module" src="src/main.js?v=157"></script>
+<!-- ── After-Action Review modal: shows at end of transit ─────────────────────── -->
+<div id="aar-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.92);z-index:9400;backdrop-filter:blur(6px);align-items:center;justify-content:center;font-family:'Courier New',monospace;overflow-y:auto;padding:30px 20px">
+  <div style="background:#0a1220;border:2px solid #44cc88;border-left:6px solid #44cc88;max-width:780px;width:95%;padding:26px 30px;color:#e0eaf5;box-shadow:0 8px 50px rgba(68,204,136,0.3);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #44cc8844">
+      <div>
+        <div style="color:#44cc88;font-size:11px;letter-spacing:3px;margin-bottom:4px">📋 AFTER-ACTION REVIEW · CLASSIFICATION: UNCLASSIFIED//FOUO</div>
+        <div id="aar-modal-title" style="color:#fff;font-size:18px;font-weight:bold;letter-spacing:1px"></div>
+      </div>
+      <button id="aar-close" style="background:rgba(8,16,28,0.95);border:1px solid #44cc8866;color:#44cc88;padding:6px 12px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px">✕ CLOSE</button>
+    </div>
+    <div id="aar-modal-body" style="font-size:12px;line-height:1.7"></div>
+  </div>
+</div>
+
+<!-- ── Engagement-response modal: pops on first Red fire during transit ─────── -->
+<div id="response-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.85);z-index:9500;backdrop-filter:blur(5px);align-items:center;justify-content:center;font-family:'Courier New',monospace">
+  <div style="background:#0a1220;border:2px solid #ff5566;border-left:6px solid #ff5566;max-width:680px;width:90%;padding:24px 28px;color:#e0eaf5;box-shadow:0 8px 40px rgba(255,85,102,0.4)">
+    <div id="response-modal-title" style="color:#ff5566;font-size:13px;letter-spacing:3px;margin-bottom:8px">🚨 INCOMING ENGAGEMENT — DECISION REQUIRED</div>
+    <div id="response-modal-body" style="font-size:14px;line-height:1.6;margin-bottom:18px;color:#fff"></div>
+    <div style="font-size:10px;letter-spacing:2px;color:#88a0b8;margin-bottom:10px">CHOOSE BLUE RESPONSE</div>
+    <div id="response-modal-options" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div style="font-size:9px;letter-spacing:1.5px;color:#445;margin-top:14px;text-align:right">RED CELL DOCTRINE WILL ADAPT TO YOUR CHOICE</div>
+  </div>
+</div>
+<script src="src/historical-incidents.js?v=160"></script>
+<script src="src/infra-layer.js?v=160"></script>
+<script src="src/ship-taxonomy.js?v=160"></script>
+<script src="src/scenarios.js?v=160"></script>
+<script src="src/routes.js?v=160"></script>
+<script src="src/exercise.js?v=160"></script>
+<script src="src/exercise-ui.js?v=160"></script>
+<script src="src/routes-ui.js?v=160"></script>
+<script type="module" src="src/main.js?v=160"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>

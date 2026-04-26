@@ -1145,6 +1145,10 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
   if (spawnBtn) spawnBtn.addEventListener('click', () => {
     if (window.game && typeof window.game.spawnAdversaries === 'function') window.game.spawnAdversaries();
   });
+  const aarClose = document.getElementById('aar-close');
+  if (aarClose) aarClose.addEventListener('click', () => {
+    const m = document.getElementById('aar-modal'); if (m) m.style.display = 'none';
+  });
   const execBtn = document.getElementById('btn-exec-route');
   if (execBtn) execBtn.addEventListener('click', () => {
     if (!window.game || typeof window.game.executePaintedRoute !== 'function') return;

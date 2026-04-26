@@ -671,7 +671,22 @@ function renderOverlay() {
 
   const body = document.getElementById('exercise-overlay-body');
   if (ex.sitrep.length === 0) {
-    body.innerHTML = '<div style="color:#7a8896;font-size:11px">No decisions logged yet. Pick one from the side panel.</div>';
+    // Scenario just started — show the brief + Turn 1 inject so the bottom
+    // overlay is informative instead of empty until first pick.
+    const turn = ex.currentTurn();
+    body.innerHTML = `
+      <div style="border-left:3px solid #ff8800;padding:8px 14px;margin-bottom:8px;background:rgba(255,136,0,0.06)">
+        <div style="color:#ff8800;font-size:10px;letter-spacing:2px;margin-bottom:4px">SCENARIO BRIEF</div>
+        <div style="color:#fff;font-size:13px;font-weight:bold;margin-bottom:4px">${ex.scenario.title}</div>
+        <div style="color:#cce0ff;font-size:11px;line-height:1.5">${ex.scenario.summary || ''}</div>
+      </div>
+      <div style="border-left:3px solid #44cc88;padding:8px 14px;margin-bottom:8px;background:rgba(68,204,136,0.06)">
+        <div style="color:#44cc88;font-size:10px;letter-spacing:2px;margin-bottom:4px">TURN 1 INJECT</div>
+        <div style="color:#cce0ff;font-size:11px;line-height:1.5">${turn ? turn.inject : ''}</div>
+      </div>
+      <div style="color:#7a8896;font-size:10px;letter-spacing:1.5px;text-align:center;padding:6px 0">
+        ▶ PICK A DIME+ DECISION FROM THE SIDE PANEL ◀
+      </div>`;
     return;
   }
   body.innerHTML = ex.sitrep.map(s => `
