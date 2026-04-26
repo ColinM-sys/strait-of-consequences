@@ -83,23 +83,79 @@
     });
   }
 
-  // ── Snap any AI-generated lat/lng off land. Spiral search for nearest water.
-  // Uses leaflet-game.js _isLand (covers Hormuz region precisely; permissive
-  // outside that region so Taiwan/Red Sea coords pass through).
+  // ── Map LLM type strings ("Aircraft Carrier", "Frigate", "Boghammar FAC", etc.)
+  // to canonical makeIcon types so OOB units get real ship SVG icons.
+  function _normalizeOobType(t) {
+    const s = String(t || '').toLowerCase();
+    if (s.includes('carrier')) return 'carrier';
+    if (s.includes('cruiser')) return 'cruiser';
+    if (s.includes('destroyer') || s.includes('frigate') || s.includes('ddg') || s.includes('ffg')) return 'destroyer';
+    if (s.includes('sub')) return 'submarine';
+    if (s.includes('fac') || s.includes('fast') || s.includes('boghammar') || s.includes('peykaap') || s.includes('attack craft') || s.includes('patrol')) return 'fac';
+    if (s.includes('mine') || s.includes('layer')) return 'minelayer';
+    if (s.includes('tanker') || s.includes('vlcc') || s.includes('cargo')) return 'tanker';
+    if (s.includes('battery') || s.includes('missile') || s.includes('sam') || s.includes('coastal') || s.includes('radar')) return 'coastal_battery';
+    return null; // unknown → fall back to circle marker
+  }
+
+  // Water bounding boxes for the major theaters the OOB generator supports.
+  // A position counts as water ONLY if it's inside one of these. Used for
+  // snap-to-water on AI-generated unit positions (LLM often puts ships
+  // slightly inland near naval bases / coast).
+  // Tight water-only bboxes (avoid Taiwan island, peninsulas, etc.)
+  const WATER_BBOXES = [
+    // Persian Gulf / Strait of Hormuz / Gulf of Oman
+    { name: 'Persian Gulf',      latLo: 24.5, latHi: 27.0, lngLo: 50.6, lngHi: 56.4 },
+    { name: 'Hormuz Strait',     latLo: 25.5, latHi: 26.7, lngLo: 56.4, lngHi: 57.5 },
+    { name: 'Gulf of Oman',      latLo: 22.5, latHi: 26.0, lngLo: 56.6, lngHi: 64.5 },
+    // Taiwan Strait — Taiwan island STARTS at ~120°E, so cap water at 119.9
+    { name: 'Taiwan Strait',     latLo: 22.5, latHi: 26.0, lngLo: 118.5, lngHi: 119.9 },
+    // East China Sea — east of Taiwan island (Taiwan east coast ~122°E)
+    { name: 'East China Sea',    latLo: 25.5, latHi: 32.0, lngLo: 122.3, lngHi: 128.5 },
+    // Bashi Channel — south of Taiwan island (Taiwan southern tip ~21.9°N)
+    { name: 'Bashi Channel',     latLo: 19.5, latHi: 21.5, lngLo: 120.5, lngHi: 122.5 },
+    // South China Sea — west of Philippines (Luzon ~120°E), south of China
+    { name: 'South China Sea',   latLo: 8.0,  latHi: 21.0, lngLo: 110.0, lngHi: 117.5 },
+    // Red Sea — between Egypt/Sudan/Saudi/Eritrea
+    { name: 'Red Sea',           latLo: 13.0, latHi: 27.5, lngLo: 33.0, lngHi: 42.5 },
+    { name: 'Bab el-Mandeb',     latLo: 11.5, latHi: 13.0, lngLo: 43.0, lngHi: 44.5 },
+    { name: 'Gulf of Aden',      latLo: 11.0, latHi: 13.5, lngLo: 43.5, lngHi: 51.0 },
+    // Black Sea
+    { name: 'Black Sea',         latLo: 41.5, latHi: 45.5, lngLo: 28.5, lngHi: 41.0 },
+    // Mediterranean (rough, mostly water)
+    { name: 'Mediterranean',     latLo: 31.5, latHi: 44.0, lngLo: -4.5, lngHi: 35.0 },
+    // English Channel + North Sea
+    { name: 'English Channel',   latLo: 49.5, latHi: 56.0, lngLo: -5.0, lngHi: 8.0 },
+    // Caribbean / Gulf of Mexico
+    { name: 'Caribbean',         latLo: 9.0,  latHi: 27.0, lngLo: -88.0, lngHi: -60.0 },
+  ];
+  function _isWater(lat, lng) {
+    return WATER_BBOXES.some(b => lat >= b.latLo && lat <= b.latHi && lng >= b.lngLo && lng <= b.lngHi);
+  }
+  function _nearestWaterAnchor(lat, lng) {
+    let best = null, bestD = Infinity;
+    for (const b of WATER_BBOXES) {
+      const cLat = (b.latLo + b.latHi) / 2, cLng = (b.lngLo + b.lngHi) / 2;
+      const d = Math.hypot(lat - cLat, lng - cLng);
+      if (d < bestD) { bestD = d; best = [cLat, cLng]; }
+    }
+    return best;
+  }
+
+  // ── Snap any AI-generated lat/lng to water if it's on land.
+  // Land/coastal units that belong on land (airbases, missile sites, ports) skip.
   function _snapToWater(lat, lng, type) {
-    if (typeof window._isLand !== 'function') return [lat, lng];
-    if (!window._isLand(lat, lng)) return [lat, lng];
-    // Land/coastal units that legitimately belong on land (airbases, missile sites, ports)
-    const landOk = ['airport', 'aerodrome', 'air_base', 'missile_battery', 'missile_site', 'airbase', 'sam_battery', 'radar', 'port'];
+    const landOk = ['airport', 'aerodrome', 'air_base', 'missile_battery', 'missile_site', 'airbase', 'sam_battery', 'radar', 'port', 'harbour', 'airfield'];
     if (type && landOk.some(t => String(type).toLowerCase().includes(t))) return [lat, lng];
-    // Otherwise (ship/sub/FAC) — find nearest water by expanding spiral
-    for (let r = 0.05; r <= 0.6; r += 0.05) {
+    if (_isWater(lat, lng)) return [lat, lng];
+    // Spiral outward from the LLM's intended position looking for water
+    for (let r = 0.1; r <= 3.0; r += 0.1) {
       for (const [dy, dx] of [[0,r],[0,-r],[r,0],[-r,0],[r,r],[-r,-r],[r,-r],[-r,r]]) {
-        const nl = lat + dy, ng = lng + dx;
-        if (!window._isLand(nl, ng)) return [nl, ng];
+        if (_isWater(lat + dy, lng + dx)) return [lat + dy, lng + dx];
       }
     }
-    return [lat, lng];
+    // Last resort: nearest water bbox center
+    return _nearestWaterAnchor(lat, lng) || [lat, lng];
   }
 
   // ── 2. AI Order-of-Battle Generator ───────────────────────────────────────
@@ -196,22 +252,48 @@
           // Enter OOB Mode — hide all existing map markers so the OOB shows clean
           _enterOobMode(map, theater);
           // Drop big, prominent markers — much more visible than the old subtle dots
-          const drop = (item, color, prefix) => {
+          const drop = (item, color, prefix, side) => {
             if (typeof item.lat !== 'number' || typeof item.lng !== 'number') return;
-            // Snap off land if the LLM put a ship/sub on land. Airbases &
-            // missile batteries stay where placed — they belong on land.
             const [snapLat, snapLng] = _snapToWater(item.lat, item.lng, item.type);
             const wasSnapped = (snapLat !== item.lat || snapLng !== item.lng);
-            const m = L.circleMarker([snapLat, snapLng], {
-              radius: 11, color, weight: 3, fillColor: color, fillOpacity: 0.6,
+            const canonType = _normalizeOobType(item.type);
+            const useShipIcon = canonType && typeof window.makeIcon === 'function' && side !== 'terrain';
+
+            let mainMarker;
+            if (useShipIcon) {
+              // Real ship SVG icon (matches existing game units visually)
+              mainMarker = L.marker([snapLat, snapLng], {
+                icon: window.makeIcon(canonType, side === 'red' ? 'red' : 'blue', false, Math.random() * 360),
+                zIndexOffset: 600,
+              }).addTo(map);
+            } else {
+              // Fall back to colored circle for terrain / unknown types
+              mainMarker = L.circleMarker([snapLat, snapLng], {
+                radius: 11, color, weight: 3, fillColor: color, fillOpacity: 0.6,
+              }).addTo(map);
+            }
+            // Always-visible label below the icon
+            const label = L.marker([snapLat, snapLng], {
+              icon: L.divIcon({
+                className: '',
+                html: `<div style="background:rgba(8,16,28,0.92);border:1px solid ${color}99;border-left:3px solid ${color};color:${color};font-family:Courier New,monospace;font-size:9px;letter-spacing:1px;padding:1px 5px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.6);text-shadow:0 0 3px #000">${(item.unit || item.name || '?').toString().slice(0, 24)}</div>`,
+                iconSize: [120, 16], iconAnchor: [-12, -4],
+              }),
+              zIndexOffset: 700,
+              interactive: false,
             }).addTo(map);
+            // Pulse ring (visual emphasis)
             const ring = L.circle([snapLat, snapLng], {
-              radius: 8000, color, weight: 1, fillOpacity: 0.05, opacity: 0.4, interactive: false,
+              radius: 8000, color, weight: 1, fillOpacity: 0.04, opacity: 0.35, interactive: false,
             }).addTo(map);
-            const snapNote = wasSnapped ? `<div style="margin-top:3px;color:#ffaa44;font-size:10px;font-style:italic">⚓ Position snapped to water (LLM coords were on land: ${item.lat?.toFixed(3)}°, ${item.lng?.toFixed(3)}°)</div>` : '';
-            m.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;background:#fff;padding:8px;min-width:240px"><div style="color:${color};letter-spacing:2px;font-size:10px;font-weight:bold">${prefix} · ${item.type || ''}</div><div style="font-weight:bold;margin-top:3px">${item.unit || item.name || '(unnamed)'}</div><div style="margin-top:3px;color:#666">${item.capability || item.significance || ''}</div><div style="margin-top:3px;color:#888;font-size:10px">${snapLat.toFixed(3)}°, ${snapLng.toFixed(3)}°</div>${snapNote}<div style="margin-top:6px;font-size:9px;color:#999">SOURCE: AI-generated OOB · Llama 3.1 8B</div></div>`);
-            _oobMarkers.push(m);
-            _oobMarkers.push(ring);
+
+            const snapNote = wasSnapped ? `<div style="margin-top:3px;color:#ffaa44;font-size:10px;font-style:italic">⚓ Snapped to water (LLM put it on land at ${item.lat?.toFixed(3)}°, ${item.lng?.toFixed(3)}°)</div>` : '';
+            mainMarker.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;background:#fff;padding:10px;min-width:260px;max-width:340px"><div style="color:${color};letter-spacing:2px;font-size:10px;font-weight:bold">${prefix} · ${item.type || ''}</div><div style="font-weight:bold;margin-top:3px;font-size:13px">${item.unit || item.name || '(unnamed)'}</div><div style="margin-top:5px;color:#444;line-height:1.4">${item.capability || item.significance || ''}</div><div style="margin-top:5px;color:#888;font-size:10px">📍 ${snapLat.toFixed(3)}°, ${snapLng.toFixed(3)}°</div>${snapNote}<div style="margin-top:6px;font-size:9px;color:#999">SOURCE: AI-generated OOB · Llama 3.1 8B</div></div>`, { autoPan: false, maxWidth: 360 });
+            // Tooltip on hover so user sees info before clicking
+            mainMarker.bindTooltip(`<b>${item.unit || item.name || '?'}</b><br><span style="color:${color}">${item.type || ''}</span>`, {
+              permanent: false, direction: 'top', offset: [0, -10], opacity: 0.92,
+            });
+            _oobMarkers.push(mainMarker, label, ring);
           };
           (o.blue_force || []).forEach(u => drop(u, '#44aaff', 'BLUE'));
           (o.red_force || []).forEach(u => drop(u, '#ff5566', 'RED'));

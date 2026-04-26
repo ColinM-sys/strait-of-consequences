@@ -1,0 +1,409 @@
+════════════════════════════════════════════════════════════════════════
+   STRAIT OF CONSEQUENCES — 5-MINUTE DEMO SCRIPT
+   SCSP Hackathon 2026 · Wargaming Track
+════════════════════════════════════════════════════════════════════════
+
+Format: paste exactly what's in <SAY> aloud. Click exactly what's in <DO>.
+The bracketed [≈ XX sec] tells you how long that section should take.
+
+
+════════════════════════════════════════════════════════════════════════
+  OPENING (15 SEC) — set the stakes
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"Real wargames at RAND, CSIS, NWC Newport take months to design and
+days to adjudicate. We collapsed that to hours, with AI running the
+scenario, the adversary, and the white cell — fully air-gapped on a
+local GPU. Zero cloud. Zero API keys."
+</SAY>
+
+<DO> Already on http://localhost:3000, map showing the Strait of Hormuz </DO>
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 1 — RUN A SCENARIO (45 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"Four hand-authored scenarios on the rung — HARASS to STRIKE. Let's
+take SEIZURE: IRGC has boarded a UAE-flagged tanker."
+</SAY>
+
+<DO>
+1. Click EXERCISE tab on the right side panel
+2. Click "🟡 SEIZURE" scenario card
+   → Bottom overlay opens with scenario brief + Turn 1 inject
+3. From the inline DIME+ decisions in the bottom overlay, click MILITARY
+   → "Forward-deploy DDG-102" (or whichever military choice is shown)
+</DO>
+
+<SAY>
+"You picked MILITARY — branching tree fires. Tehran reinforces FACs.
+Indicators move: war-risk premium spikes, alliance cohesion takes a hit.
+40 alternate decisions are hand-authored across all four scenarios —
+every playthrough actually diverges. Live map visualization on every
+pick: Bandar Abbas pulses, ships dim except the key vessel."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 2 — AI SCENARIO GENERATOR (60 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"That was hand-authored. But the platform is modular — type any premise,
+Llama 3.1 8B writes a brand-new scenario. Watch."
+</SAY>
+
+<DO>
+1. Click "🤖 AI GENERATE SCENARIO" in action bar
+2. Type EXACTLY one of these:
+</DO>
+
+EXAMPLE PROMPTS — pick the one that fits best:
+
+   GOOD (high drama):
+     IRGC mines a Saudi VLCC near Kharg Island, Brent jumps to 118
+
+   GOOD (China-pull):
+     Iranian shadow fleet AIS spoofs near Abu Musa, China demands
+     non-attribution stance from US
+
+   GOOD (escalation):
+     IRGC strikes USS Bataan with anti-ship missile, Tehran denies
+
+   PROVOCATIVE:
+     Houthi-IRGC joint mining operation closes Bab el-Mandeb
+     simultaneously with Hormuz harassment
+
+<DO>
+3. Click ▶ GENERATE
+   → Status bar shows "Llama 3.1 8B generating..." (~45s)
+4. When preview appears, scroll the modal page down
+5. Click ▶ INJECT SCENARIO INTO RIGHT PANEL
+6. Click EXERCISE tab — your AI-generated scenario appears at bottom
+7. Click it → play through it briefly to show it works
+</DO>
+
+<SAY>
+"Same DIME+ structure, fully playable, generated in under a minute on
+this laptop GPU. On a 4090 it's 15 seconds."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 3 — AI ORDER OF BATTLE (45 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"Same engine works in any theater. Watch the platform pivot from
+Hormuz to East Asia in 30 seconds."
+</SAY>
+
+<DO>
+1. Click "🛰 AI GENERATE ORDER OF BATTLE" in action bar
+2. Type EXACTLY one of:
+</DO>
+
+EXAMPLE THEATERS — pick one:
+
+   BIG WOW (East Asia pivot):
+     Taiwan Strait
+
+   ALSO BIG (Africa/Middle East):
+     Bab el-Mandeb / Red Sea
+
+   DEEP CUT (USN aware judges):
+     South China Sea
+
+<DO>
+3. ▶ GENERATE → wait ~30s
+4. Scroll modal down → click 📍 RENDER ON MAP
+   → Map auto-flies to East Asia (or wherever)
+   → All other markers hide (OOB Mode)
+   → Banner at top: "🛰 OOB MODE · Taiwan Strait [✕ EXIT]"
+   → Real ship icons drop with name labels: PLA Type-055, ROC frigates,
+     US 7th Fleet, key terrain (Penghu, Kinmen, Pratas)
+5. Click any unit → tooltip + popup with capability info
+6. Click ✕ EXIT OOB MODE → snaps back to Hormuz
+</DO>
+
+<SAY>
+"Real platform names, real coordinates, water-snapped so ships don't end
+up on land. The framework generalizes — same code base, different region."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 4 — RAG INTELLIGENCE CHAT (40 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"863 documents in a local ChromaDB corpus — 23 hand-curated insurance,
+sanctions, shadow-fleet documents plus 840 OpenStreetMap strategic
+assets. Retrieval-augmented generation, not training, so we can update
+the corpus without retraining the model."
+</SAY>
+
+<DO>
+1. Click INTEL CHAT tab on the right panel
+2. Type ONE of these queries:
+</DO>
+
+EXAMPLE QUERIES — pick one or two:
+
+   GROUNDED IN DATA (location lookup over OSM):
+     where is Ras Tanura and what's its strategic value
+     list Iranian naval bases in the Persian Gulf
+     what oil terminals are within 50 km of Bandar Abbas
+
+   INSURANCE / SANCTIONS (over the curated corpus):
+     who insures Russia and China tankers transiting the strait
+     what is Lloyd's JWC and how does it price war-risk premiums
+     how does OFAC sanction Iranian shadow-fleet operators
+
+   SCENARIO-AWARE (ship roster auto-injects):
+     what cargo is the GULF MERIDIAN carrying and who owns it
+     who stands to lose the most if MV PACIFIC LION is mined
+     which transiting tankers are bound for China right now
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 5 — SIMULATE BLUE TRANSIT + ENGAGEMENT MODAL (60 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"Decisions drive the wargame, but underneath there's a probabilistic
+combat sim. Same Blue route, different damage profile every time —
+true Monte-Carlo variance. Watch what happens when Iran fires."
+</SAY>
+
+<DO>
+1. (Optional) Click 🎲 SPAWN ADVERSARIES once or twice
+   → Adds 3-6 randomized red units; banner at bottom logs the roll
+2. Click ⏃ SIMULATE BLUE TRANSIT
+   → Formation animates west through the strait (tanker + 4 escorts
+     in column behind the carrier)
+3. WAIT for first IRGC fire (probabilistic — usually within 30s)
+   → Modal pops: "🚨 IRGC FAC-3 has fired C-802 ASCM at MV PACIFIC LION"
+   → 4 ROE response options visible
+4. Click ⚔ ESCALATE (best demo choice — drama + counter-fire)
+   → DDG immediately fires SM-2 at the FAC's radar
+   → Iran's doctrine adapts: more aggressive for rest of transit
+   → War-risk insurance jumps +200 bps onscreen
+5. Watch the rest of the transit play out
+   → AAR modal pops at end with structured debrief
+6. Scroll to bottom of AAR — you'll see "AI-GENERATED OBSERVATIONS"
+   → Llama 3.1 8B writes 3-5 doctrinal observations live (~10s)
+</DO>
+
+<SAY>
+"That's three different AI agents in one transit — Monte Carlo combat,
+LLM-driven AAR, freeze-on-engagement adjudication. Different data,
+different choice, different outcome every run."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  PART 6 — INFRASTRUCTURE LAYER + GULF FEED (15 SEC, OPTIONAL)
+════════════════════════════════════════════════════════════════════════
+
+If you have time left:
+
+<DO>
+1. Click 🌐 OSM INFRASTRUCTURE
+   → 840 strategic-asset markers light up: refineries, oil terminals,
+     airports, military bases, naval bases, power plants — color-coded
+2. Click 📡 GULF EVENTS FEED
+   → 16 cached ACLED-style geocoded April 2026 incidents drop on map,
+     color-coded by event type (maritime / military / diplomatic /
+     economic / intelligence)
+</DO>
+
+<SAY>
+"840 real-world strategic assets pulled from OpenStreetMap via
+Overpass API, ingested into the same RAG corpus. The chat knows about
+all of them."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  CLOSING (15 SEC)
+════════════════════════════════════════════════════════════════════════
+
+<SAY>
+"Six AI agent features. 863-document RAG. 840 OSM assets. Probabilistic
+Red Cell with adaptive doctrine. AI-generated scenarios for any theater.
+All running on Llama 3.1 8B locally — zero cloud, zero API keys.
+
+Real wargames are decision-driven, distributional, and air-gapped.
+This is the wargaming platform real practitioners actually want."
+</SAY>
+
+
+════════════════════════════════════════════════════════════════════════
+  ADDITIONAL CHAT QUERIES (use any of these as fillers)
+════════════════════════════════════════════════════════════════════════
+
+OSM strategic-asset lookups:
+  - what airports does Iran have inside the strait region
+  - list naval bases controlled by Iran
+  - which power plants are near Iranian coastal anti-ship missile sites
+  - what's at Kharg Island
+  - what refineries are within 100 km of the Persian Gulf coast
+
+Sanctions / insurance / shadow fleet:
+  - what is the Lloyd's JWC reclassification process for the strait
+  - what flag-of-convenience providers does Iran use for shadow fleet
+  - how do OFAC secondary sanctions affect Indian refiners
+  - what is the IMO Traffic Separation Scheme in Hormuz
+  - who underwrites Russian crude tankers transiting Hormuz
+  - what is a Listed Areas notice and which insurers issue them
+
+Historical precedent (over the 23 hand-curated docs):
+  - tell me about the 2019 Front Altair limpet mine attack
+  - what was the USS Samuel B. Roberts mine strike
+  - how did the Stena Impero seizure end
+  - what were the consequences of the 1987 SS Bridgeton incident
+
+Scenario-aware (auto-injects SIM_VESSELS roster when ships are mentioned):
+  - if MT GULF STAR is hit, who loses the most
+  - what's the cargo manifest of vessels currently transiting
+  - which tanker is the highest US priority to escort
+  - what's the stakeholder profile for China-bound tankers right now
+
+Cross-domain (mixes OSM + insurance corpus):
+  - what's the war-risk insurance impact of striking the Bandar Abbas
+    refinery vs the Larak naval base
+  - rank Iranian targets by escalation rung if struck
+
+
+════════════════════════════════════════════════════════════════════════
+  AI SCENARIO PROMPTS (50+ ready-to-paste)
+════════════════════════════════════════════════════════════════════════
+
+Mining incidents:
+  - IRGC mines a Saudi VLCC off Kharg Island, Brent jumps to 118
+  - Limpet mine on UAE-flagged tanker near Larak, Iran denies attribution
+  - Drifting moored mine drifts into Omani territorial water, Salalah port closes
+
+Seizure incidents:
+  - IRGC boards Greek-flagged VLCC near Lesser Tunb, demands prisoner swap
+  - Iranian Navy detains Indian-flagged crude tanker for "inspection"
+  - IRGC seizes UAE-flagged crude tanker bound for China at Strait of Hormuz
+
+Strike scenarios:
+  - IRGC fires anti-ship missile at USS Bataan during transit
+  - Houthi-IRGC coordinated drone swarm targets US destroyer near Bab el-Mandeb
+  - Iranian Ghadir-class submarine fires Hoot torpedo at Liberian-flagged VLCC
+
+Diplomatic / coercion scenarios:
+  - China announces it will accept Iranian crude only if Tehran ceases
+    Hormuz harassment
+  - Iran arrests UK dual-national near Bandar Abbas, demands sanctions relief
+  - Saudi Arabia and Iran simultaneously declare exclusion zones
+
+Cyber / asymmetric:
+  - IRGC cyber unit attacks Aramco SCADA systems at Ras Tanura, refinery
+    output drops 20%
+  - Iranian shadow fleet operators flood Hormuz with AIS spoofing
+  - DDoS attack on CTF 152 maritime tracking systems coincides with FAC sortie
+
+Multi-theater:
+  - Houthi-IRGC joint mining operation closes Bab el-Mandeb simultaneously
+    with Hormuz harassment
+  - Iran demands US Navy 5th Fleet leave Bahrain in exchange for tanker release
+
+
+════════════════════════════════════════════════════════════════════════
+  OOB THEATERS (ranked by demo value)
+════════════════════════════════════════════════════════════════════════
+
+TIER 1 (most impressive — judges remember these):
+  - Taiwan Strait
+  - Bab el-Mandeb
+  - South China Sea
+  - Red Sea
+
+TIER 2 (reliable, less surprising):
+  - Strait of Hormuz
+  - Persian Gulf
+  - Gulf of Oman
+  - Black Sea
+
+TIER 3 (stress test — show LLM has training data for niche regions):
+  - Strait of Bonifacio
+  - Sea of Marmara
+  - Sunda Strait
+  - Northwest Passage
+
+
+════════════════════════════════════════════════════════════════════════
+  IF JUDGES ASK COMMON QUESTIONS
+════════════════════════════════════════════════════════════════════════
+
+Q: "Why is it slow?"
+A: "Local Llama 3.1 8B on a laptop GPU. On a 4090 it's 15s. Latency is
+   a hardware variable, not a software limit. Air-gapped is the trade."
+
+Q: "How is the AI Red Cell different from a chatbot?"
+A: "Two-layer architecture. Combat resolution is Monte Carlo with
+   doctrine state machine — fast, reproducible, distribution-friendly.
+   LLM only adjudicates moments where it adds value: scenario generation,
+   AAR observations, response choices."
+
+Q: "Why decision-driven instead of unit-movement?"
+A: "Real wargames at RAND, CSIS, NWC Newport are decision-driven.
+   Players pick ROE, force posture, doctrine. Tactical movement is
+   adjudicated. Unit-movement games are a different genre."
+
+Q: "Could the AI adjudicator generate adversarial scenarios?"
+A: "Today the scenario generator + Red Cell endpoints both exist. The
+   Phase 2 work is wiring them together so Iran's response after Blue's
+   choice is LLM-driven, not doctrine-table-driven. We have the hooks."
+
+Q: "What's the path to production?"
+A: "AFWERX or DIU could deploy this on a SCIF-isolated network as a
+   training tool for Joint Maritime Component Commanders. Doctrine
+   table is hot-swappable per region. Same engine works in any theater."
+
+Q: "How do you prevent hallucination?"
+A: "Schema-validated JSON with retry-on-malformed. RAG retrieval over
+   curated corpus, not freeform. Land-snap validation on AI-generated
+   coordinates. We trust the LLM for prose, not for facts — every
+   factual claim is grounded in a retrievable source doc."
+
+
+════════════════════════════════════════════════════════════════════════
+  PRE-DEMO CHECKLIST
+════════════════════════════════════════════════════════════════════════
+
+10 minutes before demo:
+  [ ] Ollama running (system tray icon visible) — `ollama list` shows
+      both llama3.1:8b AND llama3.2-vision:11b
+  [ ] Backend running:    `python -m uvicorn server:app --port 8000`
+      from /api directory
+  [ ] Frontend running:   `python serve.py` from project root
+  [ ] Browser open at http://localhost:3000
+  [ ] Hard refresh (Ctrl+Shift+R) to load latest cache version
+  [ ] EXERCISE tab pre-clicked on right panel
+  [ ] Map zoomed to Hormuz default view
+  [ ] One scenario already pre-clicked so bottom overlay shows brief
+  [ ] Pre-warm by generating ONE throwaway scenario before judges arrive
+      (this loads the model into VRAM so the demo's first generation
+      runs at warm speed)
+  [ ] Backup laptop charger plugged in (8B inference is power-hungry)
+  [ ] Browser zoom 100% (Cmd/Ctrl + 0)
+
+
+════════════════════════════════════════════════════════════════════════
+  HOTKEY CHEAT SHEET (during demo)
+════════════════════════════════════════════════════════════════════════
+
+  Ctrl+Shift+R          Hard refresh (use if anything feels broken)
+  F12                   DevTools (only in emergencies — distracting)
+  Click 🔄 RESET        Restores all units, mines, exercise state, OSM
+                        markers, intel pins, IRGC spawns
+  Esc                   Close engagement modal during transit
+  Click outside modal   Close most modals

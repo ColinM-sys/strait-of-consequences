@@ -322,8 +322,10 @@ async def all_intel():
 import json as _json
 import os as _os
 
-OLLAMA_URL_LOCAL = "http://localhost:11434"
-OLLAMA_MODEL_LOCAL = "llama3.1:8b"
+import os as _os_init
+# Default to local. Override with OLLAMA_HOST env var (e.g. for Tailscale → 4090).
+OLLAMA_URL_LOCAL = _os_init.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL_LOCAL = _os_init.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 
 
 def _llm_json(system: str, user: str, temp: float = 0.85, num_predict: int = 1200, retries: int = 2):

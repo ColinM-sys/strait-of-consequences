@@ -268,6 +268,10 @@ function makeIcon(type, side, selected=false, headingDeg=0) {
   });
 }
 
+// Expose makeIcon so ai-features.js can render OOB units with real ship SVG
+// icons that match the rest of the map.
+if (typeof window !== 'undefined') window.makeIcon = makeIcon;
+
 function _pointInPoly(lat, lng, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

@@ -1,6 +1,79 @@
 # STRAIT OF CONSEQUENCES
 
-**AI Wargame Exercise // Strait of Hormuz // 2026**
+**AI Wargame Exercise · Strait of Hormuz · April 2026**
+**SCSP Hackathon 2026 — Wargaming Track**
+
+---
+
+## The 30-Second Pitch
+
+A **fully air-gapped, locally-hosted AI wargame** that compresses months of analog wargame design + days of human adjudication into a single same-session loop. Built for the wargaming community RAND, CSIS, and NWC Newport actually serves.
+
+> **Zero cloud calls. Zero API keys. Zero telemetry.**
+> Every model call runs on local Ollama on the user's GPU.
+
+**Local models:**
+- 🧠 **Llama 3.1 8B** — adjudication, scenario generation, RAG chat, AAR observations, adaptive Red Cell
+- 👁 **Llama 3.2 Vision 11B** — satellite imagery analysis (INTEL / SURVEY / SENTINEL)
+- 🔧 **Two custom Modelfiles** — `hormuz-vision` + `hormuz-count` (operator-tuned overlays of base 3.2 Vision)
+
+### What the platform does (at a glance)
+
+**Decision-driven exercise engine:**
+- 4 hand-authored crisis scenarios (SEIZURE / MINING / STRIKE / AIRBASE INTEL) with **40 alternate decisions** across branching trees
+- **DIME+ decision cards** (Diplomatic / Information / Military / Economic / Intelligence) with indicator deltas
+- Live map visualization on every pick — entity pulse + auto-zoom + key-vessel isolation
+- **Freeze-on-engagement modal** — when Iran fires during simulation, transit pauses, Blue Cell picks ROE response, adaptive Red doctrine adjusts for the rest of the run
+- **AAR debrief** at end of every transit with AI-generated doctrinal observations
+
+**Six AI agent endpoints** (all local LLM):
+1. **AI Scenario Generator** — type a one-line crisis premise, get a full 4-turn DIME+ scenario in 30–60s
+2. **AI Order-of-Battle Generator** — type any theater (Hormuz / Taiwan Strait / Red Sea), get realistic Blue + Red OOB
+3. **AI After-Action Review** — Llama 3.1 8B reads transit event log + writes 3-5 doctrinal observations
+4. **Adaptive Red Cell** — LLM picks Iran's response (ESCALATE / HOLD / DEESCALATE / COVERT) with rationale
+5. **Adjudicator** — generates fresh next-turn injects + 5 brand-new decisions per Blue choice
+6. **Gulf Events Feed** — 16 cached ACLED-style geocoded April 2026 incidents
+
+**RAG-grounded INTEL CHAT:**
+- ChromaDB persistent corpus with **863 docs**: 23 hand-curated insurance / sanctions / shadow-fleet / IMO-TSS / historical-incident docs + 840 OpenStreetMap strategic-asset features (refineries, oil terminals, airports, ports, military bases, naval bases, power plants)
+- Ship-aware augmentation — chat about specific vessels auto-injects the live SIM_VESSEL roster
+
+**Map visualization layer:**
+- Leaflet over ArcGIS World Imagery + CartoDB labels
+- 5 preset transit routes with per-route IRGC engagement profiles + click-to-preview
+- 🎲 SPAWN ADVERSARIES — Monte-Carlo random-anchor red unit drops with land-aware placement
+- 🌐 OSM Infrastructure overlay — 840 real strategic assets clickable
+- 📡 Gulf events feed pins (color-coded by event type)
+- 📋 IRGC Intel Pins — VLM-style annotation pins on red units
+- ✈ AIR INTEL — Iran-only airbase overlay with cached aircraft counts
+
+**Probabilistic combat backbone:**
+- Monte-Carlo Red AI with global 3-shot cap (realistic ROE-bounded fire discipline)
+- Adaptive doctrine state machine — Blue's chosen response shapes Red's parameters for rest of transit
+- Land-avoidance pathfinding for Red units (water-bbox spiral search)
+- Live OIL AT RISK metric computed from actual SIM_VESSEL cargo manifests inside the strait
+
+**Live VLM tools:**
+- 🔭 **INTEL** — draw a box, 4 parallel VLM queries (aircraft / vessel / infra / position) on the captured frame
+- 🗺 **SURVEY (3×3 GRID)** — 9 sub-tiles auto-tiled for high-density target areas
+- 🛰 **SENTINEL** — real ESA Sentinel-2 imagery before/after diff + VLM analysis
+
+**12 unit tests** covering pure-logic modules (state machine, scenario data, ship taxonomy). Logic is verified, not vibes.
+
+---
+
+## Why Air-Gapped Matters
+
+This is built for the **operator who already has a GPU on their network** — SCIF, ship's CIC, forward operating base, classified-environment lab. **No internet required at runtime.** The platform deploys anywhere the operator has hardware, with no external dependency.
+
+**Generation latency is a hardware variable:**
+| Hardware | Scenario gen (~3,500 tokens) |
+|---|---|
+| Lenovo laptop (consumer mobile GPU) | ~60s |
+| RTX 4090 desktop | ~45s |
+| Jetson Orin Nano | ~3 min |
+
+Every other AI hackathon entry probably routes through OpenAI / Anthropic. This one doesn't, by design. **A few seconds of latency in exchange for guaranteed sovereignty.**
 
 ---
 
