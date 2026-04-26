@@ -1255,6 +1255,24 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
     // 3. Clear painted route overlay if any
     try { if (window._lastRouteOverlay && window.game && window.game.map) window.game.map.removeLayer(window._lastRouteOverlay); } catch (e) {}
     window._lastRouteOverlay = null;
+    // 3b. Clear all hand-drawn paint lines from the paint tool
+    try {
+      if (window.game && window.game._paintLines && window.game._map) {
+        window.game._paintLines.forEach(l => window.game._map.removeLayer(l));
+        window.game._paintLines.length = 0;
+      }
+      if (window.game && window.game._activeLine && window.game._map) {
+        window.game._map.removeLayer(window.game._activeLine);
+        window.game._activeLine = null;
+      }
+    } catch (e) {}
+    // 3c. Clear simulate-blue-transit planned + trail polylines
+    try {
+      if (window._transitPolylines && window.game && window.game._map) {
+        window._transitPolylines.forEach(p => { try { window.game._map.removeLayer(p); } catch (e) {} });
+        window._transitPolylines.length = 0;
+      }
+    } catch (e) {}
     // 4. Clear historical-incident markers
     if (typeof window.hideHistoricalIncidents === 'function') window.hideHistoricalIncidents();
     // 5. Clear active-mine registry
@@ -2757,3 +2775,113 @@ if (typeof renderScenarioCards === 'function') {
 } else {
   console.warn('Exercise UI not loaded');
 }
+
+// ── Collapse toggles for bottom action-bar and right panel ─────────────────
+(() => {
+  const tA = document.getElementById('toggle-action-bar');
+  const tP = document.getElementById('toggle-panel');
+  if (tA) tA.addEventListener('click', () => {
+    document.body.classList.toggle('action-collapsed');
+    tA.textContent = document.body.classList.contains('action-collapsed') ? '▲' : '▼';
+  });
+  if (tP) tP.addEventListener('click', () => {
+    document.body.classList.toggle('panel-collapsed');
+    // Trigger Leaflet map resize so the larger map area redraws
+    if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
+  });
+})();
+
+// ── Transit log close ✕ button (injected; panel innerHTML is rebuilt on each update) ──
+(() => {
+  const tlp = document.getElementById('transit-log-panel');
+  if (!tlp) return;
+  // Inject a close button via a wrapper that survives innerHTML rewrites of children
+  const closeBtn = document.createElement('button');
+  closeBtn.id = 'transit-log-close';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close';
+  closeBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    tlp.classList.remove('visible');
+  });
+  tlp.appendChild(closeBtn);
+  // Re-attach the close button if innerHTML rewrites strip it
+  const reattach = () => {
+    if (!tlp.contains(closeBtn)) tlp.appendChild(closeBtn);
+  };
+  // Observe and re-attach
+  new MutationObserver(reattach).observe(tlp, { childList: true });
+})();
+
+// ── VLM output: scroll the intel-report-body into view if hidden by overlap ──
+(() => {
+  const obs = new MutationObserver(() => {
+    const ov = document.getElementById('intel-report-overlay');
+    if (ov && ov.classList.contains('visible')) {
+      const body = document.getElementById('intel-report-body');
+      if (body) body.scrollTop = 0;
+    }
+  });
+  const ov = document.getElementById('intel-report-overlay');
+  if (ov) obs.observe(ov, { attributes: true, attributeFilter: ['class'] });
+})();
+
+// ── Make intel-report-overlay draggable so VLM output never gets stuck behind anything ──
+(() => {
+  const ov = document.getElementById('intel-report-overlay');
+  const header = document.getElementById('intel-report-header');
+  if (!ov || !header) return;
+  let dragging = false, dx = 0, dy = 0;
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return; // ignore clicks on header buttons
+    dragging = true;
+    const rect = ov.getBoundingClientRect();
+    // Convert from anchored to free-floating on first drag
+    if (!ov.classList.contains('dragged')) {
+      ov.classList.add('dragged');
+      ov.style.left = rect.left + 'px';
+      ov.style.top  = rect.top  + 'px';
+      ov.style.width  = rect.width  + 'px';
+      ov.style.height = rect.height + 'px';
+    }
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    ov.style.left = (e.clientX - dx) + 'px';
+    ov.style.top  = (e.clientY - dy) + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// ── Adaptive idle escalation ladder — lives even with no exercise active ──
+// Bumps based on red/blue events, decays toward CONTESTED (rung 1) over time.
+(() => {
+  if (typeof window === 'undefined') return;
+  window._liveEscalationRung = window._liveEscalationRung ?? 1; // start at SEIZURE (post-Apr-18)
+  const _bump = (delta, reason) => {
+    window._liveEscalationRung = Math.max(0, Math.min(5, (window._liveEscalationRung || 0) + delta));
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+    console.log(`[ESC] ${reason} → rung ${window._liveEscalationRung}`);
+  };
+  window._bumpLiveEscalation = _bump;
+
+  // Hook into game events if game emitter exists
+  if (window.game && typeof window.game.on === 'function') {
+    window.game.on('escalation', ({ level, reason }) => {
+      // Map 0-100 to 0-5 ladder rungs
+      const targetRung = Math.min(5, Math.floor(level / 17));
+      if (targetRung > (window._liveEscalationRung || 0)) {
+        _bump(targetRung - window._liveEscalationRung, reason || 'red event');
+      }
+    });
+  }
+
+  // Slow decay toward rung 1 (CONTESTED) every 30s so it doesn't stay pinned high forever
+  setInterval(() => {
+    const r = window._liveEscalationRung || 0;
+    if (r > 1) _bump(-1, 'time decay');
+  }, 30000);
+})();

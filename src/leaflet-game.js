@@ -2496,6 +2496,11 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
   // Draw the planned route line in cyan + a moving trail behind tanker in green
   const plannedLine = L.polyline(path, { color: '#88ccff', weight: 2, opacity: 0.6, dashArray: '5 6', interactive: false }).addTo(this._map);
   const trail = L.polyline([], { color: '#44cc88', weight: 3, opacity: 0.85, interactive: false }).addTo(this._map);
+  // Register so RESET can clean these up
+  if (typeof window !== 'undefined') {
+    window._transitPolylines = window._transitPolylines || [];
+    window._transitPolylines.push(plannedLine, trail);
+  }
   let trailPts = [start];
 
   const triggered = new Set();
@@ -2509,6 +2514,11 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
 
   // Compute escort offset perpendicular to current segment direction
   const PROX_KM = 90;
+  // Adaptive total animation time so long painted routes don't drag forever.
+  // Target ~22s total → distribute across segments. Clamp per-segment STEPS to [12, 60].
+  const _segCount = Math.max(1, path.length - 1);
+  const _msPerSeg = Math.max(600, Math.round(22000 / _segCount));
+  const _STEPS_PER_SEG = Math.max(12, Math.min(60, Math.round(_msPerSeg / 50)));
   for (let i = 1; i < path.length; i++) {
     if (this._abortRoute) break;
     const from = path[i-1], to = path[i];
@@ -2527,7 +2537,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
     if (ddgR.marker)                ddgR.marker.setIcon(makeIcon(ddgR.type,    'blue', false, headingDeg));
     if (cruiser && cruiser.marker)  cruiser.marker.setIcon(makeIcon(cruiser.type,'blue', false, headingDeg));
     if (carrier && carrier.marker)  carrier.marker.setIcon(makeIcon(carrier.type,'blue', false, headingDeg));
-    const STEPS = 60;
+    const STEPS = _STEPS_PER_SEG;
     for (let s = 1; s <= STEPS; s++) {
       const t = s / STEPS;
       const lat = from[0] + dLat * t;

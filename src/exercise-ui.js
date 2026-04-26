@@ -4,15 +4,20 @@ function renderScenarioCards() {
   const container = document.getElementById('scenario-cards');
   if (!container) return;
   container.innerHTML = '';
+  // Tighter cards so all 4 fit in the panel without scrolling
+  container.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:none;overflow:visible';
   for (const s of SCENARIOS) {
     const card = document.createElement('div');
     card.style.cssText = `
-      border:1px solid ${s.rungColor}66; padding:10px 12px; margin-bottom:8px;
-      cursor:pointer; transition:all 0.15s; background:rgba(255,170,0,0.04)`;
+      border:1px solid ${s.rungColor}66; padding:7px 10px;
+      cursor:pointer; transition:all 0.15s; background:rgba(255,170,0,0.04);
+      border-left:3px solid ${s.rungColor}`;
     card.innerHTML = `
-      <div style="color:${s.rungColor};font-size:11px;letter-spacing:2px;font-weight:bold">${s.rung}</div>
-      <div style="color:#e0e8f0;font-size:13px;margin:4px 0">${s.title}</div>
-      <div style="color:#7a8896;font-size:10px;line-height:1.4">${s.summary.substring(0, 120)}…</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+        <div style="color:#e0e8f0;font-size:12px;font-weight:bold;line-height:1.3">${s.title}</div>
+        <div style="color:${s.rungColor};font-size:9px;letter-spacing:2px;flex-shrink:0">${s.rung}</div>
+      </div>
+      <div style="color:#7a8896;font-size:10px;line-height:1.35;margin-top:3px">${s.summary.substring(0, 90)}…</div>
     `;
     card.addEventListener('mouseenter', () => card.style.background = 'rgba(255,170,0,0.12)');
     card.addEventListener('mouseleave', () => card.style.background = 'rgba(255,170,0,0.04)');
@@ -68,19 +73,54 @@ function startExercise(scenarioId) {
   }
   renderIndicators();
 
-  // Scenario-specific map dressings
+  // Scenario-specific map dressings + opening simulation animation
   _clearScenarioMarkers();
   if (scenarioId === 'mining') {
-    // Drop mine markers at the historical pattern + the fictional ALPINE CONFIDENCE strike point
     dropMineMarkers([
       { lat: 25.20, lng: 56.40, label: 'LIMPET STRIKE — ALPINE CONFIDENCE', note: 'Detonated. Vessel taking on water. (T0)' },
       { lat: 25.18, lng: 56.42, label: 'INERT LIMPET RECOVERED', note: 'Found on Greek-flagged tanker. Forensic match: IRGC.' },
     ]);
-    // Zoom to show the mine field
     if (window.game && window.game.map) {
       window.game.map.flyToBounds(L.latLngBounds([[25.10,50.00],[28.00,57.00]]), { padding:[60,60], maxZoom:7, duration:1.2 });
     }
   }
+
+  // Generic scenario opening: pulse + ring on each key vessel for 8s
+  try {
+    if (window.game && window.game.map && Array.isArray(activeExercise.scenario.keyVessels)
+        && typeof window._aisVessels !== 'undefined') {
+      const map = window.game.map;
+      const ringColors = { seizure: '#ff5544', mining: '#ff8844', strike: '#ff2222', airbase_intel: '#ffcc44' };
+      const ringColor = ringColors[scenarioId] || '#ffaa44';
+      activeExercise.scenario.keyVessels.forEach(name => {
+        let target = null;
+        window._aisVessels.forEach(({ marker, v }) => { if (v && (v.id === name || v.name === name)) target = marker; });
+        if (!target) return;
+        const ll = target.getLatLng();
+        // Pulsing ring expanding outward
+        let r = 800;
+        const ring = L.circle(ll, { radius: r, color: ringColor, weight: 3, fillOpacity: 0.18, interactive: false }).addTo(map);
+        _addScenarioMarker(ring);
+        const pulse = setInterval(() => {
+          r += 600;
+          ring.setRadius(r);
+          ring.setStyle({ opacity: Math.max(0, 1 - (r - 800) / 12000) });
+          if (r >= 13000) { clearInterval(pulse); try { map.removeLayer(ring); } catch (e) {} }
+        }, 110);
+      });
+      // Fly to bounding box of key vessels
+      const keyLatLngs = [];
+      window._aisVessels.forEach(({ marker, v }) => {
+        if (activeExercise.scenario.keyVessels.includes(v.id) || activeExercise.scenario.keyVessels.includes(v.name)) {
+          keyLatLngs.push(marker.getLatLng());
+        }
+      });
+      if (keyLatLngs.length > 0) {
+        const bounds = L.latLngBounds(keyLatLngs);
+        setTimeout(() => map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 9, duration: 1.4 }), 400);
+      }
+    }
+  } catch (e) { console.warn('[scenario animation]', e); }
 }
 
 function endExercise() {
@@ -279,22 +319,29 @@ function syncLegacyStateStrip() {
   const ATRISK_BY_RUNG = [0, 3, 7, 12, 18, 21]; // HARASS → WAR
   const BPD_BY_RUNG    = [0.0, 0.6, 1.3, 2.2, 3.4, 3.9]; // M BPD held up
   if (!activeExercise) {
-    // Idle = April 2026 baseline. Brent $106, war-risk elevated to 720 bps after
-    // Apr 18 incident, strait CONTESTED. OIL AT RISK is computed dynamically
-    // from the actual tankers visible on the AIS tracker (SIM_VESSELS).
-    // Live combat events (red fires, blue counter-fires) bump _liveInsuranceDelta.
-    ladder.forEach(r => r.classList.remove('current'));
-    if (ladder[0]) ladder[0].classList.add('current');
+    // Idle but ADAPTIVE: ladder reflects live red/blue events through window._liveEscalationRung,
+    // bumped by combat events and decayed every 30s back toward CONTESTED.
+    const liveRung = (typeof window !== 'undefined' && typeof window._liveEscalationRung === 'number')
+      ? Math.max(0, Math.min(5, window._liveEscalationRung)) : 0;
+    ladder.forEach((r, idx) => {
+      r.classList.toggle('current', idx === liveRung);
+      if (idx === liveRung) {
+        const info = (typeof _RUNG_INFO !== 'undefined' && _RUNG_INFO[idx]) ? _RUNG_INFO[idx] : null;
+        if (info) { r.style.borderColor = info.color; r.style.color = info.color; r.style.background = info.color + '22'; }
+      } else { r.style.borderColor = ''; r.style.color = ''; r.style.background = ''; }
+    });
     const pct = _computeOilAtRiskPct();
     const liveDelta = (typeof window !== 'undefined' && window._liveInsuranceDelta) || 0;
-    const insBps = 720 + liveDelta;
+    // Insurance scales with live rung (bps): rung 0 → 600, rung 5 → SUSPENDED
+    const RUNG_INS_BASE = [600, 720, 950, 1200, 1500, 1800];
+    const insBps = (RUNG_INS_BASE[liveRung] || 720) + liveDelta;
     if (oil)  oil.textContent  = pct.toFixed(1) + '% world supply';
     if (bpd)  bpd.textContent  = '$106 Brent · ' + pct.toFixed(1) + 'M BPD held up';
     if (ins) {
       if (insBps >= 1500) { ins.textContent = 'SUSPENDED'; ins.style.color = '#ff4444'; }
       else                 { ins.textContent = insBps + ' bps'; ins.style.color = insBps > 1000 ? '#ff8833' : ''; }
     }
-    if (clos) clos.textContent = insBps >= 1500 ? 'CLOSED' : 'CONTESTED';
+    if (clos) clos.textContent = liveRung >= 4 ? 'CLOSED' : (liveRung >= 2 ? 'CONTESTED' : 'OPEN');
     return;
   }
   const ind = activeExercise.indicators;
@@ -715,13 +762,68 @@ function renderOverlay() {
     });
     return;
   }
-  body.innerHTML = ex.sitrep.map(s => `
+  // Sitrep history (past turns) + current turn's decision cards inline so the user
+  // never has to scroll to the right sidebar to pick the next move.
+  const sitrepHtml = ex.sitrep.map(s => `
     <div style="border-left:2px solid #ff660055;padding:6px 10px;margin-bottom:6px">
       <div style="color:#ff8800;font-size:10px;letter-spacing:2px">T${s.turn} · ${s.lane}</div>
       <div style="color:#e0e8f0;font-size:12px;margin:3px 0">${s.title}</div>
       <div style="color:#a0b0c0;font-size:11px;line-height:1.5">${formatAssessment(s.assessment)}</div>
     </div>
   `).join('');
+
+  // Affected vessels banner (so user sees which ships this scenario impacts)
+  const keyVesselsHtml = (ex.scenario.keyVessels && ex.scenario.keyVessels.length)
+    ? `<div style="border-left:3px solid #ffcc44;padding:6px 12px;margin-bottom:8px;background:rgba(255,204,68,0.06)">
+         <div style="color:#ffcc44;font-size:10px;letter-spacing:2px;margin-bottom:3px">▸ AFFECTED VESSELS — TURN ${ex.turn}</div>
+         <div style="color:#cce0ff;font-size:11px">${ex.scenario.keyVessels.join(' · ')}</div>
+       </div>`
+    : '';
+
+  let nextDecisionsHtml = '';
+  if (!ex.complete) {
+    const turn = ex.currentTurn();
+    const laneColorsX = { DIPLOMATIC:'#ffcc66', INFORMATION:'#cc66ff', MILITARY:'#ff6666', ECONOMIC:'#66ccff', INTELLIGENCE:'#66ff99' };
+    const laneIconsX  = { DIPLOMATIC:'🤝', INFORMATION:'📻', MILITARY:'⚔', ECONOMIC:'💰', INTELLIGENCE:'🛰' };
+    nextDecisionsHtml = `
+      <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:10px 0 6px 0">═════ TURN ${ex.turn} OF ${ex.scenario.turns.length} — CHOOSE A DIME+ DECISION ═════</div>
+      ${(turn?.decisions || []).map((d, idx) => {
+        const c = laneColorsX[d.lane] || '#cccccc';
+        const icon = laneIconsX[d.lane] || '◇';
+        return `
+          <div class="overlay-dec-card" data-dec-idx="${idx}" style="border:1px solid ${c}55;border-left:3px solid ${c};background:rgba(255,255,255,0.02);padding:8px 12px;cursor:pointer;transition:background 0.15s;margin-bottom:6px">
+            <div style="color:${c};font-size:9px;letter-spacing:2px;font-weight:bold">${icon} ${d.lane}</div>
+            <div style="color:#fff;font-size:12px;margin-top:3px;font-weight:bold">${d.title}</div>
+            <div style="color:#a0b0c0;font-size:10px;margin-top:4px;line-height:1.4">${d.assessment ? d.assessment.slice(0, 200) + (d.assessment.length > 200 ? '...' : '') : ''}</div>
+          </div>`;
+      }).join('')}`;
+  }
+
+  // Decisions FIRST so the user never has to scroll past sitrep history to pick.
+  // Sitrep history shown below, collapsed under a small label.
+  const sitrepWrapped = sitrepHtml
+    ? `<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #ff660044">
+         <div style="color:#996644;font-size:9px;letter-spacing:2px;margin-bottom:6px">▾ PRIOR TURNS — SITREP HISTORY</div>
+         ${sitrepHtml}
+       </div>`
+    : '';
+  body.innerHTML = keyVesselsHtml + nextDecisionsHtml + sitrepWrapped;
+  // Auto-scroll the overlay back to the TOP so new decisions are immediately visible
+  const overlayEl = document.getElementById('exercise-overlay');
+  if (overlayEl) requestAnimationFrame(() => { overlayEl.scrollTop = 0; });
+  // Sidebar decision list is now redundant — clear it to avoid the user picking in two places
+  const sidebarDec = document.getElementById('exercise-decisions');
+  if (sidebarDec) sidebarDec.innerHTML = '<div style="color:#7a8896;font-size:11px;line-height:1.5;padding:8px;letter-spacing:1px">▾ Pick a decision in the bottom overlay (centered).</div>';
+  // Wire the inline decision cards so picking from the bottom overlay works just like the sidebar
+  body.querySelectorAll('.overlay-dec-card').forEach(card => {
+    card.addEventListener('mouseenter', () => { card.style.background = 'rgba(255,255,255,0.08)'; });
+    card.addEventListener('mouseleave', () => { card.style.background = 'rgba(255,255,255,0.02)'; });
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.dataset.decIdx, 10);
+      const dec = (ex.currentTurn()?.decisions || [])[idx];
+      if (dec) onDecisionPicked(dec);
+    });
+  });
   // Only auto-scroll when a NEW sitrep entry has been added (not on every render).
   // Without this guard the panel jumps to the bottom on every AI-adjudicated re-render too.
   const overlay = document.getElementById('exercise-overlay');

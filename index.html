@@ -246,19 +246,87 @@
     }
     #intel-btn:hover { background: rgba(170,102,255,0.15); }
     #intel-btn.loading { opacity: 0.5; cursor: wait; }
-    /* Full-screen intel report viewer */
+    /* Full-screen intel report viewer — sits ABOVE collapsable bars (z-index 70 > action-bar 60) */
     #intel-report-overlay {
       display: none; position: fixed;
       top: 0; left: 0; right: 340px; bottom: 110px;
-      background: rgba(4,6,14,0.97); z-index: 60;
+      background: rgba(4,6,14,0.97); z-index: 70;
       flex-direction: column; font-family: 'Courier New', monospace;
       border-right: 1px solid #aa66ff;
     }
+    body.action-collapsed #intel-report-overlay { bottom: 0; }
+    body.panel-collapsed  #intel-report-overlay { right: 0; }
+    /* Slide every bottom-anchored element down with the action bar */
+    body.action-collapsed #exercise-overlay  { bottom: 0 !important; height: 100vh !important; }
+    body.action-collapsed #legend            { bottom: 14px; }
+    body.action-collapsed #transit-counter   { bottom: 130px; }
+    body.action-collapsed #transit-log-panel { bottom: 110px; }
+    body.panel-collapsed  #exercise-overlay  { right: 0; }
+
+    /* ── COLLAPSE TOGGLES ─────────────────────────────────────── */
+    #toggle-action-bar {
+      position: fixed; bottom: 110px; right: 348px; z-index: 65;
+      width: 28px; height: 22px; border: 1px solid var(--border);
+      border-bottom: none; background: rgba(4,10,20,0.97); color: var(--blue);
+      font-family: 'Courier New', monospace; font-size: 14px; line-height: 1;
+      cursor: pointer; transition: bottom 0.25s ease, right 0.25s ease;
+    }
+    #toggle-action-bar:hover { color: var(--text); border-color: var(--blue); }
+    body.action-collapsed #action-bar { transform: translateY(120px); }
+    body.action-collapsed #toggle-action-bar { bottom: 0; }
+    body.panel-collapsed  #toggle-action-bar { right: 8px; }
+    #action-bar { transition: transform 0.25s ease; }
+
+    #toggle-panel {
+      position: fixed; top: 12px; right: 348px; z-index: 65;
+      width: 22px; height: 28px; border: 1px solid var(--border);
+      border-right: none; background: rgba(4,10,20,0.97); color: var(--blue);
+      font-family: 'Courier New', monospace; font-size: 14px; line-height: 1;
+      cursor: pointer; transition: right 0.25s ease;
+    }
+    #toggle-panel:hover { color: var(--text); border-color: var(--blue); }
+    body.panel-collapsed #panel { transform: translateX(340px); }
+    body.panel-collapsed #toggle-panel { right: 8px; transform: rotate(180deg); }
+    body.panel-collapsed #map        { width: 100%; }
+    body.panel-collapsed #action-bar { width: 100%; }
+    #panel { transition: transform 0.25s ease; }
+    #map, #action-bar { transition: width 0.25s ease; }
+    /* Right-rail action buttons slide right with the panel so they sit at the new map edge */
+    #intel-btn, #survey-btn, #airport-intel-btn, #sentinel-btn, #btn-present, #btn-tour,
+    #paint-toolbar, #paint-coords, #map-dpad, #transit-counter { transition: transform 0.25s ease; }
+    body.panel-collapsed #intel-btn,
+    body.panel-collapsed #survey-btn,
+    body.panel-collapsed #airport-intel-btn,
+    body.panel-collapsed #sentinel-btn,
+    body.panel-collapsed #btn-present,
+    body.panel-collapsed #btn-tour,
+    body.panel-collapsed #paint-toolbar,
+    body.panel-collapsed #paint-coords,
+    body.panel-collapsed #map-dpad { transform: translateX(340px); }
+    /* Black "bar" residue under collapsed action-bar — kill action-bar's borders so nothing peeks through */
+    body.action-collapsed #action-bar { border-top: none; border-right: none; }
+
+    /* Close ✕ for transit-log-panel */
+    #transit-log-close {
+      position: absolute; top: 4px; right: 6px; background: none; border: none;
+      color: var(--dim); font-family: 'Courier New', monospace; font-size: 16px;
+      cursor: pointer; padding: 2px 6px; line-height: 1;
+    }
+    #transit-log-close:hover { color: var(--text); }
+
+    /* Make ship-cat-sidebar close button bigger and more visible */
+    #ship-cat-sidebar-close { font-size: 16px !important; padding: 4px 12px !important; font-weight: bold; }
     #intel-report-overlay.visible { display: flex; }
     #intel-report-header {
       flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
       padding: 14px 24px; border-bottom: 1px solid #aa66ff;
       color: #aa66ff; font-size: 12px; letter-spacing: 3px;
+      cursor: move; user-select: none;
+    }
+    #intel-report-header::before { content: '⋮⋮ DRAG '; color: #aa66ff88; margin-right: 6px; font-size: 10px; }
+    /* When dragged, switch from anchored layout to free-floating */
+    #intel-report-overlay.dragged {
+      width: 720px; height: 480px; right: auto; bottom: auto; resize: both; overflow: auto;
     }
     #intel-report-close {
       background: none; border: 1px solid #aa66ff; color: #aa66ff;
@@ -786,6 +854,8 @@
 </div>
 <div id="transit-log-panel"></div>
 
+<button id="toggle-panel" title="Collapse / expand right panel">◀</button>
+<button id="toggle-action-bar" title="Collapse / expand bottom action bar">▼</button>
 <div id="action-bar">
   <button class="action-btn yellow" id="btn-hist-toggle"><span class="btn-icon">⚠</span><span class="btn-label">MINE / ATTACK<br>HISTORY</span><span class="btn-cost">show on map</span></button>
   <button class="action-btn cyan"   id="btn-sim-transit"><span class="btn-icon">⏃</span><span class="btn-label">SIMULATE<br>BLUE TRANSIT</span><span class="btn-cost">DDG west-bound</span></button>
@@ -869,7 +939,7 @@
       <div id="exercise-brief" style="font-size:12px;line-height:1.5;color:#cce0ff;margin-bottom:10px"></div>
       <div id="exercise-key-vessels"></div>
       <div id="exercise-decisions"></div>
-      <button id="exercise-end-btn" style="margin-top:auto;padding:8px;background:rgba(255,80,80,0.1);color:#ff8888;border:1px solid #ff666633;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:2px">END EXERCISE</button>
+      <button id="exercise-end-btn" style="margin-top:12px;padding:10px;background:rgba(255,80,80,0.18);color:#ff9999;border:1.5px solid #ff5555aa;cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:2px;font-weight:bold">⏹ END EXERCISE NOW</button>
     </div>
   </div>
   </div><!-- end #panel-exercise -->
