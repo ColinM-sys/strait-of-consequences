@@ -690,6 +690,8 @@ function _startAIS() {
     // outbound (COG 0–180) = heading east toward GOO = navDir -1 (idx decreases)
     v._navDir = (v.cog > 180) ? 1 : -1;
     v._navIdx = _nearestNavIdx(v.lat, v.lng);
+    v._currentLat = v.lat;
+    v._currentLng = v.lng;
 
     const icon   = _aisIcon(v.type, v.flag, v.cog);
     const marker = L.marker([v.lat, v.lng], { icon, zIndexOffset: -100, interactive: true }).addTo(map);
@@ -745,9 +747,13 @@ function _startAIS() {
 
     marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true, autoPan: false });
     _aisVessels.set(v.mmsi, { marker, label, v, makePopup });
+    v._marker = marker;
+    v._label  = label;
   });
 
   console.log(`[AIS] ${SIM_VESSELS.length} vessels on nav channel`);
+  // Expose for live oil-at-risk computation in syncLegacyStateStrip
+  window.SIM_VESSELS = SIM_VESSELS;
   _updateTransitDisplay();
 
   // Advance vessels along the nav channel every 3 s (kept visible during exercises)
@@ -1133,12 +1139,15 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
   if (simBtn) simBtn.addEventListener('click', () => {
     if (window.simulateBlueTransit) window.simulateBlueTransit();
   });
+  const spawnBtn = document.getElementById('btn-spawn-adv');
+  if (spawnBtn) spawnBtn.addEventListener('click', () => {
+    if (window.game && typeof window.game.spawnAdversaries === 'function') window.game.spawnAdversaries();
+  });
   const execBtn = document.getElementById('btn-exec-route');
   if (execBtn) execBtn.addEventListener('click', () => {
     if (!window.game || typeof window.game.executePaintedRoute !== 'function') return;
     const path = window.game._lastPaintedPath;
     if (!path || path.length < 2) {
-      // Visible feedback so the failure mode is obvious
       const banner = document.createElement('div');
       banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#ffaa44;padding:10px 20px;border:1px solid #ffaa4488;border-left:4px solid #ffaa44;z-index:9000;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
       banner.innerHTML = '⚠ NO PAINTED ROUTE — click 🟡 PATH (paint toolbar, top-right of map), then click-drag a route on the water. Then hit ▶ EXECUTE PAINTED ROUTE again.';
@@ -1216,6 +1225,13 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
   if (resetBtn) resetBtn.addEventListener('click', () => {
     // 1. End any active exercise (clears mines, restores dim, etc.)
     if (typeof window.endExercise === 'function') window.endExercise();
+    // 1a. Clear any Monte-Carlo spawned adversaries
+    if (window.game && typeof window.game.clearSpawnedAdversaries === 'function') {
+      window.game.clearSpawnedAdversaries();
+    }
+    // 1b. Toggle off IRGC intel pins if they're showing
+    const _pinsBtn = document.getElementById('btn-iran-intel');
+    if (_pinsBtn && document.querySelector('.irgc-intel-pin')) _pinsBtn.click();
     // 2. Restore game units to their UNIT_DEFS starting positions + heading
     if (window.game && window.game._units) {
       window.game._units.forEach(u => {

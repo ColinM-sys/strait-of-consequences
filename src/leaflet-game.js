@@ -255,7 +255,10 @@ function shipSVG(type, side, selected) {
 
 function makeIcon(type, side, selected=false, headingDeg=0) {
   const svg  = shipSVG(type, side, selected);
-  const size = type==='carrier' ? 48 : type==='tanker' ? 42 : type==='fac' ? 26 : type==='coastal_battery' ? 34 : 36;
+  // Blue fleet drawn at half-size for less visual congestion in the strait.
+  // Red units keep original size so they remain readable as threats.
+  const baseSize = type==='carrier' ? 48 : type==='tanker' ? 42 : type==='fac' ? 26 : type==='coastal_battery' ? 34 : 36;
+  const size = side === 'blue' ? Math.round(baseSize / 2) : baseSize;
   return L.divIcon({
     html: `<div class="ship-marker${selected?' ship-selected':''}" title="${type}"
               style="transform:rotate(${headingDeg}deg);transform-origin:center">${svg}</div>`,
@@ -1968,6 +1971,25 @@ export class LeafletGame {
 // ── Module-level sleep ────────────────────────────────────────────────────────
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ── Stacking transit-log: single container so banners don't overlap ──────────
+function _transitLog(html, accent = '#44ccff', dwellMs = 3500) {
+  let log = document.getElementById('transit-log');
+  if (!log) {
+    log = document.createElement('div');
+    log.id = 'transit-log';
+    log.style.cssText = 'position:fixed;bottom:140px;left:20px;z-index:600;display:flex;flex-direction:column-reverse;gap:6px;max-width:540px;pointer-events:none';
+    document.body.appendChild(log);
+  }
+  const row = document.createElement('div');
+  row.style.cssText = `background:rgba(0,8,16,0.94);color:${accent};padding:7px 16px;border:1px solid ${accent}88;border-left:4px solid ${accent};font-family:Courier New,monospace;font-size:11px;letter-spacing:1.3px;box-shadow:0 4px 14px rgba(0,0,0,0.6);transition:opacity 0.5s ease;opacity:1;line-height:1.4`;
+  row.innerHTML = html;
+  log.appendChild(row);
+  // Cap concurrent rows to 6 — oldest gets removed when 7th arrives
+  while (log.children.length > 6) log.firstChild.remove();
+  setTimeout(() => { row.style.opacity = '0'; }, dwellMs);
+  setTimeout(() => { row.remove(); }, dwellMs + 600);
+}
+
 // ── Destroyer sweep + engagement helpers (used by executePaintedRoute) ───────
 LeafletGame.prototype._sweepMine = function (mine) {
   const map = this._map;
@@ -1978,13 +2000,7 @@ LeafletGame.prototype._sweepMine = function (mine) {
   // Remove the mine marker + its kill-radius ring
   if (mine.marker) map.removeLayer(mine.marker);
   if (mine.ring)   map.removeLayer(mine.ring);
-  // Sweep banner
-  const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#44ccff;padding:8px 18px;border:1px solid #44ccff88;border-left:4px solid #44ccff;z-index:600;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
-  banner.innerHTML = `<span style="color:#44ccff">⚓ MINE NEUTRALIZED</span> · ${mine.label || 'IRGC LIMPET'} · MCM sweep complete`;
-  document.body.appendChild(banner);
-  setTimeout(() => banner.style.opacity = '0', 2200);
-  setTimeout(() => banner.remove(), 2900);
+  _transitLog(`<span style="color:#44ccff">⚓ MINE NEUTRALIZED</span> · ${mine.label || 'IRGC LIMPET'} · MCM sweep complete`, '#44ccff', 3000);
 };
 
 LeafletGame.prototype._engageFac = function (fac) {
@@ -2002,13 +2018,202 @@ LeafletGame.prototype._engageFac = function (fac) {
   L.marker([ll.lat, ll.lng], { icon: wreck, interactive: false }).addTo(map);
   // Remove FAC marker
   if (fac.marker) map.removeLayer(fac.marker);
-  // Engagement banner
-  const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#ff8844;padding:8px 18px;border:1px solid #ff884488;border-left:4px solid #ff8844;z-index:600;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
-  banner.innerHTML = `<span style="color:#ff8844">⚔ ${fac.name} NEUTRALIZED</span> · DDG engaged with naval gunfire / ESSM`;
-  document.body.appendChild(banner);
-  setTimeout(() => banner.style.opacity = '0', 2200);
-  setTimeout(() => banner.remove(), 2900);
+  _transitLog(`<span style="color:#ff8844">⚔ ${fac.name} NEUTRALIZED</span> · DDG engaged with naval gunfire / ESSM`, '#ff8844', 3500);
+};
+
+// ── Land bounding boxes — units must not enter these. Conservative coverage of
+// Iranian islands + Iranian/Omani/UAE/Qatar coastlines bordering the strait.
+const LAND_BBOXES = [
+  // Iranian coast strip (north of strait)
+  { latLo: 27.05, latHi: 30.0,  lngLo: 49.0,  lngHi: 60.0 },
+  // Qeshm Island
+  { latLo: 26.55, latHi: 27.05, lngLo: 55.55, lngHi: 56.40 },
+  // Larak Island
+  { latLo: 26.78, latHi: 26.92, lngLo: 56.30, lngHi: 56.46 },
+  // Hengam
+  { latLo: 26.62, latHi: 26.72, lngLo: 55.83, lngHi: 55.95 },
+  // Greater Tunb
+  { latLo: 26.23, latHi: 26.32, lngLo: 55.27, lngHi: 55.36 },
+  // Lesser Tunb
+  { latLo: 26.21, latHi: 26.27, lngLo: 55.10, lngHi: 55.18 },
+  // Abu Musa
+  { latLo: 25.83, latHi: 25.92, lngLo: 54.99, lngHi: 55.07 },
+  // Omani Musandam Peninsula
+  { latLo: 25.85, latHi: 26.55, lngLo: 56.42, lngHi: 56.85 },
+  // UAE coast
+  { latLo: 22.6, latHi: 25.85, lngLo: 51.5,  lngHi: 56.40 },
+  // Qatar / Saudi / Bahrain (north-west Gulf)
+  { latLo: 24.5, latHi: 30.0,  lngLo: 49.5,  lngHi: 51.5 },
+];
+function _isOnLand(lat, lng) {
+  for (const b of LAND_BBOXES) {
+    if (lat >= b.latLo && lat <= b.latHi && lng >= b.lngLo && lng <= b.lngHi) return true;
+  }
+  return false;
+}
+
+// ── Spawn adversaries: drop a randomized cohort of red units (Monte-Carlo roll)
+// All spawned units integrate with _redCombatStep so they pursue + fire during
+// painted-route execution. Each click = a fresh probabilistic roll.
+LeafletGame.prototype.spawnAdversaries = function (opts = {}) {
+  // Water-only anchor points (verified — all in open water, away from islands & coast).
+  // Spawn position = anchor + small random jitter (±0.07° ≈ ±8km), so spawns can't
+  // drift onto Qeshm, Larak, Abu Musa, the Tunbs, or the Iranian/Omani coasts.
+  const SPAWN_ANCHORS = [
+    [25.50, 57.50],  // Gulf of Oman entry
+    [26.20, 56.40],  // TSS westbound lane south of Larak
+    [25.80, 56.20],  // mid-strait open water
+    [25.65, 55.30],  // south of Abu Musa
+    [25.50, 54.50],  // south Persian Gulf approach
+    [26.25, 53.80],  // central Persian Gulf
+    [26.30, 53.00],  // western Persian Gulf
+    [26.40, 52.20],  // far west, clear water
+  ];
+  const JITTER = 0.07;  // ~8km variance — enough to scatter, never enough to hit land
+  const cohortSize = opts.size || (3 + Math.floor(Math.random() * 4));  // 3-6
+  const types = ['fac', 'fac', 'fac', 'fac', 'submarine', 'minelayer'];  // FACs weighted high
+  const rollNum = (this._spawnRolls || 0) + 1;
+  this._spawnRolls = rollNum;
+
+  for (let i = 0; i < cohortSize; i++) {
+    const anchor = SPAWN_ANCHORS[Math.floor(Math.random() * SPAWN_ANCHORS.length)];
+    const lat = anchor[0] + (Math.random() * 2 - 1) * JITTER;
+    const lng = anchor[1] + (Math.random() * 2 - 1) * JITTER;
+    const type = types[Math.floor(Math.random() * types.length)];
+    const id = `spawn-${rollNum}-${i}-${Date.now()}`;
+    const namePrefix = type === 'submarine' ? 'IRS' : type === 'minelayer' ? 'IRGC ML' : 'IRGC FAC';
+    const unit = {
+      id, name: `${namePrefix}-${rollNum}.${i+1}`, side:'red', type,
+      lat, lng,
+      marker: null,
+      health: { fac: 80, submarine: 100, minelayer: 80 }[type] ?? 80,
+      actionsLeft: 6,
+      destroyed: false,
+      heading: 0,
+      _heading: 0,
+      _origLat: lat,
+      _origLng: lng,
+      _origType: type,
+      _origSide: 'red',
+      _origHeading: 0,
+      _spawned: true,
+    };
+    const marker = L.marker([lat, lng], {
+      icon: makeIcon(type, 'red', false, 0),
+      zIndexOffset: 50,
+    }).addTo(this._map);
+    marker.on('click', (e) => { L.DomEvent.stopPropagation(e); this._selectUnit(unit); });
+    unit.marker = marker;
+    this._units.push(unit);
+  }
+  if (typeof _transitLog === 'function') {
+    _transitLog(`<span style="color:#ff5566">🎲 ROLL #${rollNum} · ${cohortSize} ADVERSARIES SPAWNED</span> · Monte-Carlo cohort active — they will pursue & engage during transit`, '#ff5566', 4500);
+  }
+};
+
+LeafletGame.prototype.clearSpawnedAdversaries = function () {
+  const before = this._units.length;
+  this._units = this._units.filter(u => {
+    if (u._spawned) { if (u.marker) this._map.removeLayer(u.marker); return false; }
+    return true;
+  });
+  const removed = before - this._units.length;
+  if (typeof _transitLog === 'function' && removed > 0) {
+    _transitLog(`<span style="color:#88ddff">✕ CLEARED ${removed} SPAWNED ADVERSARIES</span> · Map reset to baseline IRGC order of battle`, '#88ddff', 3000);
+  }
+};
+
+// ── Red AI: FACs + sub pursue and engage Blue during painted-route transit ──
+LeafletGame.prototype._redCombatStep = function (bluePositions) {
+  if (!this._combatState) this._combatState = { shotsFiredBy: {}, turnsSinceShot: {}, totalShots: 0 };
+  const state = this._combatState;
+  // Global shot budget: realistic IRGC engagement against a CSG is 2-3 missile/torpedo
+  // launches max before Blue counter-fire neutralizes the threat.
+  const MAX_TOTAL_SHOTS = 3;
+  const haver = (a, b) => {
+    const R = 6371, dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+    const lat1 = a.lat*Math.PI/180, lat2 = b.lat*Math.PI/180;
+    const x = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+  const reds = this._units.filter(u => !u.destroyed && u.side === 'red' && u.marker);
+  for (const r of reds) {
+    const rLL = r.marker.getLatLng();
+    let nearest = null, ndist = Infinity;
+    for (const bp of bluePositions) {
+      const d = haver(rLL, bp.ll);
+      if (d < ndist) { ndist = d; nearest = bp; }
+    }
+    if (!nearest) continue;
+
+    if (r.type === 'fac') {
+      // Pursue Blue from far out — FACs will sortie when Blue is within 250km
+      if (ndist < 250 && ndist > 6) {
+        const dLat = nearest.ll.lat - rLL.lat;
+        const dLng = nearest.ll.lng - rLL.lng;
+        const mag = Math.hypot(dLat, dLng) || 1;
+        const stepDeg = 0.022;  // ~2.4km/step at 100ms — fast attack craft sprint
+        let nLat = rLL.lat + dLat/mag * stepDeg;
+        let nLng = rLL.lng + dLng/mag * stepDeg;
+        // Land-avoidance: if direct step hits land, try sliding 90° port then 90° stbd
+        // along the coastline to navigate around islands.
+        if (_isOnLand(nLat, nLng)) {
+          const perpLat = -dLng/mag * stepDeg;
+          const perpLng =  dLat/mag * stepDeg;
+          const portLat = rLL.lat + perpLat, portLng = rLL.lng + perpLng;
+          const stbdLat = rLL.lat - perpLat, stbdLng = rLL.lng - perpLng;
+          if (!_isOnLand(portLat, portLng))      { nLat = portLat; nLng = portLng; }
+          else if (!_isOnLand(stbdLat, stbdLng)) { nLat = stbdLat; nLng = stbdLng; }
+          else { nLat = rLL.lat; nLng = rLL.lng; }  // both blocked, hold
+        }
+        r.marker.setLatLng([nLat, nLng]);
+        const heading = ((Math.atan2(nLng - rLL.lng, nLat - rLL.lat) * 180/Math.PI) - 90 + 720) % 360;
+        r.marker.setIcon(makeIcon(r.type, 'red', false, heading));
+      }
+      // Fire ONLY if global budget remains, this FAC hasn't shot yet, and we win
+      // a 25% per-step roll — keeps total launches realistic (typically 1-2).
+      const alreadyShot = !!state.shotsFiredBy[r.id];
+      if (state.totalShots < MAX_TOTAL_SHOTS && !alreadyShot && ndist <= 40 && Math.random() < 0.25) {
+        state.shotsFiredBy[r.id] = 1;
+        state.totalShots += 1;
+        this._fireRedShot(r, nearest, 0.45, 'C-802 ASCM');
+      }
+    }
+
+    if (r.type === 'submarine') {
+      // One torpedo max per sub per transit, on a probabilistic per-step roll.
+      const alreadyShot = !!state.shotsFiredBy[r.id];
+      if (state.totalShots < MAX_TOTAL_SHOTS && !alreadyShot && ndist <= 80 && Math.random() < 0.18) {
+        state.shotsFiredBy[r.id] = 1;
+        state.totalShots += 1;
+        this._fireRedShot(r, nearest, 0.30, 'TYPE-53 TORPEDO');
+      }
+    }
+  }
+};
+
+LeafletGame.prototype._fireRedShot = function (attacker, target, hitChance, weapon) {
+  const map = this._map;
+  const aLL = attacker.marker.getLatLng();
+  const tLL = target.ll;
+  const tracer = L.polyline([[aLL.lat, aLL.lng], [tLL.lat, tLL.lng]], {
+    color: '#ff3344', weight: 2, opacity: 0.85, dashArray: '4 4', interactive: false
+  }).addTo(map);
+  setTimeout(() => map.removeLayer(tracer), 1200);
+
+  _transitLog(`<span style="color:#ff5566">⚠ ${attacker.name} FIRING</span> · ${weapon} INBOUND ON ${target.unit.name}`, '#ff5566', 4000);
+
+  const hit = Math.random() < hitChance;
+  setTimeout(() => {
+    if (hit) {
+      const flash = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:30px;animation:fxBoom 1.4s ease-out forwards;text-shadow:0 0 20px #ff3300">💥</div>', iconSize:[30,30] });
+      const fx = L.marker([tLL.lat, tLL.lng], { icon: flash, interactive: false, zIndexOffset: 800 }).addTo(map);
+      setTimeout(() => map.removeLayer(fx), 1600);
+      _transitLog(`<span style="color:#ffaa44">⊠ ${target.unit.name} HIT</span> · ${weapon} from ${attacker.name} · superficial damage, vessel underway`, '#ffaa44', 4500);
+    } else {
+      _transitLog(`<span style="color:#88ddff">⛒ CIWS INTERCEPT</span> · ${weapon} from ${attacker.name} defeated · ${target.unit.name} unharmed`, '#88ddff', 3500);
+    }
+  }, 1100);
 };
 
 // ── Painted-route execution: tanker + 2 escort DDGs follow the painted path ──
@@ -2023,6 +2228,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
   }
   if (this._routeRunning) return;
   this._routeRunning = true;
+  this._combatState = { shotsFiredBy: {}, turnsSinceShot: {}, totalShots: 0 };
 
   const tanker = this._units.find(u => u.id === 'tanker1');
   const ddgL   = this._units.find(u => u.id === 'ddg102');
@@ -2099,7 +2305,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
     if (ddgR.marker)                ddgR.marker.setIcon(makeIcon(ddgR.type,    'blue', false, headingDeg));
     if (cruiser && cruiser.marker)  cruiser.marker.setIcon(makeIcon(cruiser.type,'blue', false, headingDeg));
     if (carrier && carrier.marker)  carrier.marker.setIcon(makeIcon(carrier.type,'blue', false, headingDeg));
-    const STEPS = 30;
+    const STEPS = 60;
     for (let s = 1; s <= STEPS; s++) {
       const t = s / STEPS;
       const lat = from[0] + dLat * t;
@@ -2130,7 +2336,12 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
           }
         }
       }
-      // Engage FACs
+      // Red AI: FACs pursue and fire ASCMs at Blue, sub fires torpedoes
+      const blueUnitsLive = [tanker, ddgL, ddgR, cruiser, carrier].filter(u => u && u.marker);
+      const bluePositions = blueUnitsLive.map(u => ({ unit: u, ll: u.marker.getLatLng() }));
+      this._redCombatStep(bluePositions);
+
+      // DDG counter-engagement: kill FACs that close to ≤15km
       const facs = this._units.filter(u => !u.destroyed && u.side === 'red' && u.type === 'fac' && u.marker);
       for (const fac of facs) {
         const fll = fac.marker.getLatLng();
@@ -2143,46 +2354,29 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
       // Append to green trail (every 3rd step to keep it light)
       if (s % 3 === 0) { trailPts.push([lat, lng]); trail.setLatLngs(trailPts); }
 
-      // Historical proximity alerts
-      for (const inc of incidents) {
-        if (triggered.has(inc.id)) continue;
-        const d = haversineKm([lat, lng], [inc.lat, inc.lng]);
-        if (d <= PROX_KM) {
-          triggered.add(inc.id);
-          // Bump exercise indicators for live demo feel — proximity to a historical
-          // mine/attack point should spike war-risk and twitch escalation
-          if (window.activeExercise && !window.activeExercise.complete) {
-            const delta = inc.type === 'MINE' ? { warRiskInsurance:+25, escalationRung:+1 }
-                       : inc.type === 'LIMPET' ? { warRiskInsurance:+20, oilPrice:+2 }
-                       : inc.type === 'SEIZURE' ? { warRiskInsurance:+10, iranCoercion:+2 }
-                       : { warRiskInsurance:+12 };
-            if (typeof window.activeExercise.applyDelta === 'function') {
-              window.activeExercise.applyDelta(delta);
-            }
-            if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
-            if (typeof window.renderIndicators === 'function') window.renderIndicators();
-          }
-          // Reuse the banner from historical-incidents.js if available
-          const banner = document.createElement('div');
-          banner.style.cssText = `position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ${inc.color};border-left:5px solid ${inc.color};z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
-          banner.innerHTML = `<div style="color:${inc.color};font-size:10px;letter-spacing:2px;margin-bottom:2px">⚠ ESCORT-ROUTE PROXIMITY — ${inc.type} · ${d.toFixed(0)} KM</div>
-            <div style="color:#fff;font-weight:bold;margin-bottom:4px">${inc.name} · ${inc.date}</div>
-            <div style="color:#ccddee;line-height:1.5">${inc.desc}</div>`;
-          document.body.appendChild(banner);
-          setTimeout(() => banner.style.opacity = '0', 5500);
-          setTimeout(() => banner.remove(), 6200);
-          // Pulse the historical marker
-          const ring = L.circle([inc.lat, inc.lng], { radius: 1500, color: inc.color, weight: 4, fillOpacity: 0.18, interactive: false }).addTo(this._map);
-          let r = 1500;
-          const pulse = setInterval(() => {
-            r += 700; ring.setRadius(r); ring.setStyle({ opacity: Math.max(0, 1 - (r - 1500) / 12000) });
-            if (r >= 14000) { clearInterval(pulse); this._map.removeLayer(ring); }
-          }, 90);
+      // Drift civilian SIM_VESSELS along their nav direction so they progress
+      // through the strait + the OIL AT RISK number drops as they exit.
+      if (window.SIM_VESSELS) {
+        for (const sv of window.SIM_VESSELS) {
+          if (sv._cleared) continue;
+          const navDir = sv._navDir || 1;  // +1 inbound (westward), -1 outbound (eastward)
+          const driftLng = -0.012 * navDir; // ~1.3km/step westward for inbound
+          const driftLat = 0;
+          const newLat = (sv._currentLat ?? sv.lat) + driftLat;
+          const newLng = (sv._currentLng ?? sv.lng) + driftLng;
+          sv._currentLat = newLat;
+          sv._currentLng = newLng;
+          if (sv._marker) sv._marker.setLatLng([newLat, newLng]);
+          if (sv._label)  sv._label.setLatLng([newLat, newLng]);
         }
       }
-      await _sleep(36);
+      // Recompute OIL AT RISK from updated vessel positions every 10 steps
+      if (s % 10 === 0 && typeof window.syncLegacyStateStrip === 'function') {
+        window.syncLegacyStateStrip();
+      }
+      await _sleep(50);
     }
   }
   this._routeRunning = false;
-  if (this._emit) this._emit('info', `Route transit complete · ${triggered.size}/${incidents.length} historical incidents in proximity`);
+  if (this._emit) this._emit('info', 'Blue formation transit complete.');
 };

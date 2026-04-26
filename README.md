@@ -2,25 +2,69 @@
 
 **AI Wargame Exercise // Strait of Hormuz // 2026**
 
-A locally-hosted, air-gapped wargame exercise tool simulating crisis escalation in the Strait of Hormuz. Built for the SCSP Hackathon 2026 — Wargaming Track.
+---
 
-Format follows the canonical professional wargame pattern (RAND / CSIS / NWC Newport / NSC crisis sims): scenario brief → multi-turn injects → Blue Cell decisions → adjudicated effects + indicator deltas. Map and ships serve as the visualization layer; the loop is decision-driven, not unit-movement-driven.
+## SCSP Hackathon 2026 Submission
+
+**Team:** Colin McDonough · Alex Smith · Deborah Debeauville
+**Track:** Wargaming
+**Repo:** https://github.com/ColinM-sys/strait-of-consequences
+
+**What we built:** A locally-hosted, air-gapped AI wargame exercise tool that simulates crisis escalation in the Strait of Hormuz. Replaces the months-long analog wargame design + days-long adjudication cycle with a same-session loop: scenario brief → multi-turn injects → Blue Cell DIME+ decisions → AI-adjudicated effects + indicator deltas + live map visualization. Includes a live AI Red Cell adversary (FACs pursue + fire missiles, sub launches torpedoes) with realistic ROE-bounded fire discipline (3-shot global cap), Monte-Carlo adversary spawning, hand-authored 40-decision branching tree, dynamic oil-at-risk metric computed live from real cargo-manifest data, RAG-augmented intelligence chat grounded in JCS/CSIS doctrinal corpus, and live VLM analysis on user-drawn satellite imagery — all on a single GPU, zero cloud calls, zero API keys.
+
+**Datasets / APIs used:**
+- **GDELT 2.0** + **ACLED** — geocoded Gulf-region incident feed for scenario seeding
+- **Joint Chiefs Doctrine Library** (JP 3-0, 3-32, 5-0) ingested into ChromaDB RAG corpus
+- **CSIS Analysis Library** Hormuz wargame reports + Iran A2/AD analysis ingested into RAG
+- **Global Terrorism Database** (1970–2020) for historical analog research (Tanker War, 2019 Fujairah limpet mines, Stena Impero seizure)
+- **OpenStreetMap / Overpass API** — live infrastructure layer (Persian Gulf ports, oil terminals, airbases)
+- **ESA Sentinel-2** (Copernicus Data Space) — before/after satellite imagery for VLM analysis
+- **ArcGIS World Imagery** — base map tiles
+- **Custom 5,400-doc military intelligence RAG corpus** (open-source, unclassified) including 20 hand-curated docs on Lloyd's JWC war-risk insurance, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules
+- **Llama 3.1 8B** (adjudication / chat) + **Llama 3.2 Vision 11B** (satellite VLM) running locally via Ollama
+- **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) — operator-tuned overlays of base Llama 3.2 Vision
+
+**How to run:**
+```bash
+# Prereqs: Python 3.11+, Ollama (with llama3.1:8b + llama3.2-vision:11b pulled)
+
+# Backend (RAG + AI agents) on :8000
+cd api
+pip install -r requirements.txt
+python -m uvicorn server:app --port 8000
+
+# Frontend on :3000 (separate terminal)
+cd ..
+python serve.py
+
+# Optional: ollama serve  (separate terminal — Windows tray app handles automatically)
+```
+Open `http://localhost:3000`. One-shot Linux/macOS/Git-Bash launch: `./start.sh`
+
+---
+
+A locally-hosted, air-gapped wargame exercise tool simulating crisis escalation in the Strait of Hormuz. Format follows the canonical professional wargame pattern (RAND / CSIS / NWC Newport / NSC crisis sims): scenario brief → multi-turn injects → Blue Cell decisions → adjudicated effects + indicator deltas. Map and ships serve as the visualization layer; the loop is decision-driven, not unit-movement-driven.
 
 ---
 
 ## What Sets This Apart (Judge Highlights)
 
 - **Fully air-gapped local AI.** Every model call (Llama 3.1 8B for adjudication / chat, Llama 3.2 Vision 11B for satellite analysis) runs on the local GPU via Ollama. Zero cloud, zero API keys, zero telemetry. Reproducible, deployable, classified-environment-compatible.
-- **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) derived from `llama3.2-vision:11b` with hand-tuned system prompts that (a) defeat the base model's refusal-to-count-military-assets behavior and (b) embed visual heuristics for vessel/aircraft detection (wake-based vessel ID, swept-wing aircraft silhouettes). Same base model, different operator-tuned overlays.
-- **Hand-authored branching decision tree.** Turn 1 MILITARY pick → ESCALATION path; Turn 1 DIPLOMATIC pick → DE-ESCALATION path. **40 alternate decisions hand-written** across 4 scenarios (8 branch turns × 5 DIME+ decisions). Deterministic, demo-safe, every playthrough actually diverges.
-- **Live AI adjudicator endpoint** (`POST /scenario/next_turn`). Llama 3.1 8B reads scenario state + Blue's specific pick + indicator history and generates a fresh inject + 5 brand-new DIME+ decisions on the fly. Strict JSON-schema validation with graceful fallback. Built but disabled by default for demo speed (8B is 25-35s/turn on a Lenovo laptop GPU); enable when a faster GPU is reachable.
-- **Live map visualization on every decision.** Picked decision text + the next turn's content are parsed for known entities (Bandar Abbas / Fujairah / Strait of Hormuz / Larak / Qeshm / Ras Tanura / Jebel Ali / Kish + every named SIM_VESSEL + every game unit). Map flies to bounding box, pulses every mentioned location with green rings, draws connecting lines, dims all unmentioned ships to 18% (SDA-style key-asset isolation).
-- **20-category ship-actor taxonomy** with per-ship stakeholder impact bars. Click ▶ STRIKE CONSEQUENCES on any vessel — opens a wide left-side panel with the actual stakeholder exposure (e.g., "🇨🇳 China 96/100 — Primary buyer, 2.1M bbl Aramco crude" on a China-bound Saudi VLCC). Per-vessel, not per-category-generic.
-- **Historical mining + attack overlay** with **6 real geocoded incidents** (USS Samuel B. Roberts 1988, SS Bridgeton 1987, Fujairah 4-tanker limpet 2019, Front Altair / Kokuka Courageous 2019, Stena Impero 2019, M. Star 2010). Every Blue transit simulation auto-detects when the formation passes within 90 km of any of these and flashes the incident description + pulses the marker.
-- **Painted-route tanker transit simulation.** Paint a custom route through the strait → MV PACIFIC LION (tanker) animates along it with two DDGs flanking ~20 km port/starboard, ~11 km astern, headings auto-rotating per segment. End report scored against the historical-incident proximity layer.
-- **Interactive VLM exercise.** AIRBASE INTEL scenario INTELLIGENCE decisions auto-fly the map to Bandar Abbas, drop the user into draw-to-select mode, and run live Llama 3.2 Vision 11B analysis on a captured Sentinel-2 / ArcGIS frame the user picked. Results stream back into the exercise sitrep.
-- **12 unit tests** covering the pure-logic modules (state machine, scenario data validation, ship taxonomy). Wargame logic is verified, not vibes.
-- **Iran-only airport overlay.** Red-team focus filter: narrowed from 91 Gulf-region airports (Iran/Iraq/UAE/Saudi/Pakistan/etc.) down to 14 IRIAF / IRGC AF airports. Other Gulf-state friendlies excluded.
+- **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) derived from `llama3.2-vision:11b` with hand-tuned system prompts that (a) defeat the base model's refusal-to-count-military-assets behavior and (b) embed visual heuristics for vessel/aircraft detection. Same base model, operator-tuned overlays.
+- **Hand-authored branching decision tree.** Turn 1 MILITARY pick → ESCALATION path; Turn 1 DIPLOMATIC pick → DE-ESCALATION path. **40 alternate decisions hand-written** across 4 scenarios. Deterministic, demo-safe, every playthrough actually diverges.
+- **Live AI adjudicator endpoint** (`POST /scenario/next_turn`). Llama 3.1 8B reads scenario state + Blue's specific pick + indicator history and generates a fresh inject + 5 brand-new DIME+ decisions on the fly. Strict JSON-schema validation with graceful fallback.
+- **Live map visualization on every decision.** Picked decision text is parsed for known entities (cities / ports / SIM_VESSELS / game units). Map flies to bounding box, pulses every mentioned location with green rings, dims unmentioned ships to 18% (SDA-style key-asset isolation).
+- **Red AI Combat during transit.** IRGC FACs **pursue Blue formation** at ~52 knots, **fire C-802 ASCMs** at ≤40 km with 45% hit / 55% CIWS-intercept. Iranian Ghadir submarine launches Type-53 torpedoes at ≤80 km with 30% hit. **Realistic global shot budget — max 3 launches per transit total** — so out of 10+ FACs in the area, only 1-2 actually commit before Blue counter-fire suppresses them. Each transit produces a different damage profile (true Monte-Carlo variance).
+- **Land-avoidance pathfinding for Red AI.** FACs pursue Blue using vector pursuit but check 11 land-bbox polygons (Iranian coast, Qeshm, Larak, Hengam, the Tunbs, Abu Musa, Musandam Peninsula, UAE/Qatar/Saudi coasts). If direct path hits land, they slide 90° port or starboard to navigate around. No more boats clipping through islands.
+- **🎲 Spawn Adversaries (Monte-Carlo button).** One click drops 3-6 randomized red units at water-only anchor points (with ±8 km jitter) — mix of FACs, sub, mine-layer. Every roll produces a different threat geometry. Click multiple times to stack adversaries. RESET clears them.
+- **Dynamic OIL AT RISK metric.** Live percentage computed from actual SIM_VESSEL cargo manifests still inside the Persian Gulf bbox (24–28°N / 50.5–58°E). Crude in M bbl + LNG/LPG converted to barrels-of-oil-equivalent (LNG: 7.3 boe/MT, LPG: 11.6 boe/MT), divided by world daily supply (100 MBD). **Decreases live during transit** as westbound tankers exit at lng < 50.5° and eastbound exit at lng > 58°. Idle baseline ~11.6%; lands somewhere in 4-8% by transit end.
+- **20-category ship-actor taxonomy** with per-ship stakeholder impact bars + **0-100 US PRIORITY score per vessel** (USN treaty assets = 95-100, China-bound flag-of-convenience = 28, humanitarian = 90).
+- **Historical mining + attack overlay** with **6 real geocoded incidents** (USS Samuel B. Roberts 1988, SS Bridgeton 1987, Fujairah 4-tanker limpet 2019, Front Altair / Kokuka Courageous 2019, Stena Impero 2019, M. Star 2010). Toggle on demand via ⚠ MINE/ATTACK HISTORY button.
+- **Painted-route tanker transit simulation.** Paint a custom route → MV PACIFIC LION + 4-ship escort (DDG×2 + cruiser + carrier) animates along it in CSG diamond formation, headings auto-rotating per segment.
+- **Stacking transit-log overlay.** All combat events (mine sweeps, FAC kills, ASCM launches, hits, CIWS intercepts) route through a single bottom-left log container — newest pushes up, 6-row cap, smooth fades. No more banner pile-ups.
+- **Interactive VLM exercise.** AIRBASE INTEL scenario INTELLIGENCE decisions auto-fly the map to Bandar Abbas, drop the user into draw-to-select mode, and run live Llama 3.2 Vision 11B analysis on a captured frame.
+- **12 unit tests** covering pure-logic modules (state machine, scenario validation, ship taxonomy). Wargame logic is verified, not vibes.
+- **Iran-only airport overlay.** ✈ AIR INTEL filter narrowed from 91 Gulf-region airports down to 14 IRIAF / IRGC AF airports.
 
 ---
 
@@ -99,16 +143,18 @@ All three use the same base model (`llama3.2-vision:11b` running locally on Olla
 - **NIGHT TRANSIT** (purple) — reduced IRGC ISR; rear intercept possible; attribution confidence drops 3
 
 ### Live State Strip (always visible above scenarios)
-- **Escalation Ladder** (HARASS → SEIZURE → MINING → STRIKE → CLOSURE → WAR) — current rung flashes orange and updates live every decision pick
-- **Econ bar** — OIL PRICE, WAR-RISK INSURANCE (bps), IRAN CLOSURE (OPEN / CONTESTED / CLOSED, derived from rung)
-- **Coalition flag bar** — 🇬🇧 🇫🇷 🇸🇦 🇺🇳 🇨🇳. Click any flag → popover with that country's per-scenario position and "WITH BLUE" / "NOT WITH BLUE" badge. UK / France / Saudi auto-flip hostile if alliance cohesion drops below 50.
-- Whole strip flashes amber on every decision pick — visible feedback that the system processed your input even if values didn't change
+- **Escalation Ladder** (HARASS → SEIZURE → MINING → STRIKE → CLOSURE → WAR) — current rung flashes orange and updates live every decision pick. Click any rung for an explanation popover.
+- **Econ bar** — OIL AT RISK (computed live from real SIM_VESSEL cargo manifests inside the strait bbox), $ Brent + M BPD held up, WAR-RISK INSURANCE (bps), IRAN CLOSURE status (OPEN / CONTESTED / CLOSED).
+- **Coalition flag bar** — 🇬🇧 🇫🇷 🇸🇦 🇺🇳 🇨🇳. Click any flag → popover (auto-clamps to viewport so it never overflows screen edge) with that country's per-scenario position and "WITH BLUE" / "NOT WITH BLUE" badge. UK / France / Saudi auto-flip hostile if alliance cohesion drops below 50.
+- Whole strip flashes amber on every decision pick — visible feedback that the system processed your input.
 
 ### Combat & Engagement (during transit)
-- **Destroyer mine sweep** — any DDG within 5 km of a live mine pops it (cyan banner, mine + kill-radius ring removed)
-- **Destroyer FAC engagement** — any DDG within 15 km of an IRGC FAC kills it (orange banner + ⊗ wreck icon, FAC marker removed)
-- **Historical-incident proximity alerts** — formation passing within 90 km of any of the 6 historical mining/attack points triggers a banner + pulses the marker + bumps war-risk insurance
-- **Map-event indicator deltas** — every animation type (STRIKE / MINED / OIL_SLICK / BOARDED / DISABLED / SINKING / CONVOY_FORM / TRANSIT_HALT) auto-bumps escalation rung + econ indicators when the exercise is active
+- **Red AI driving every red unit.** FACs scan for nearest Blue, pursue at ~52 kn (with land-bbox avoidance), launch C-802 ASCMs at ≤40 km. Sub launches Type-53 torpedoes at ≤80 km. **Global cap of 3 launches per transit** + per-unit cap of 1, plus probabilistic per-step roll → realistic suppression dynamics where most FACs never get to fire before being killed. Same Blue route, different damage profile every time = true Monte-Carlo variance.
+- **Land-avoidance pathfinding.** Red AI checks 11 land-bboxes (Iranian coast, Qeshm, Larak, Hengam, the Tunbs, Abu Musa, Musandam Peninsula, UAE/Qatar/Saudi). If pursuit step lands on land, the FAC slides 90° port or starboard. If both blocked, holds position.
+- **Destroyer counter-engagement.** DDG within 5 km of a live mine sweeps it. DDG within 15 km of an IRGC FAC kills it (orange ⊗ wreck icon, FAC marker removed).
+- **Stacking transit-log.** All events (sweeps, kills, fires, hits, CIWS intercepts) appear in a single right-anchored stack at bottom-left. Column-reverse (newest on top), 6-row cap with smooth fade, no banner overlapping.
+- **Live OIL AT RISK ticker.** SIM_VESSELS drift along their nav direction during transit (~1.3 km/step westbound for inbound, eastbound for outbound). Every 10 steps the % updates from the current ship positions — drops as tankers cross 50.5°E (exiting west) or 58°E (exiting east).
+- **Map-event indicator deltas** — every animation type (STRIKE / MINED / OIL_SLICK / BOARDED / DISABLED / SINKING / CONVOY_FORM / TRANSIT_HALT) auto-bumps escalation rung + econ indicators when an exercise is active.
 
 ### Diamond Escort Formation
 All 5 Blue surface units transit together with proper standoff spacing (no overlap):

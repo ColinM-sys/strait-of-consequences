@@ -189,7 +189,9 @@ function _showCoalitionPopover(flagEl, flagId) {
   const color = isHostile ? '#ff6666' : '#66ff99';
   const popover = document.createElement('div');
   popover.className = 'coalition-popover';
-  popover.style.cssText = `position:fixed;top:${rect.bottom + 8}px;left:${Math.max(8, rect.left - 80)}px;width:280px;background:rgba(0,8,16,0.97);border:1px solid ${color};border-left:4px solid ${color};padding:10px 12px;z-index:9000;font-family:Courier New,monospace;font-size:11px;color:#cce0ff;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
+  const POP_W = 280;
+  const popLeft = Math.min(window.innerWidth - POP_W - 16, Math.max(8, rect.left - 80));
+  popover.style.cssText = `position:fixed;top:${rect.bottom + 8}px;left:${popLeft}px;width:${POP_W}px;background:rgba(0,8,16,0.97);border:1px solid ${color};border-left:4px solid ${color};padding:10px 12px;z-index:9000;font-family:Courier New,monospace;font-size:11px;color:#cce0ff;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
   popover.innerHTML = `<div style="color:${color};font-size:10px;letter-spacing:2px;margin-bottom:4px">${flagEl.title.toUpperCase()} · ${isHostile ? 'NOT WITH BLUE' : 'WITH BLUE'}</div>${pos.note}`;
   document.body.appendChild(popover);
   setTimeout(() => {
@@ -212,6 +214,47 @@ function _wireCoalitionFlags() {
   });
   _coalitionWired = true;
 }
+
+// Compute oil-at-risk dynamically from SIM_VESSELS still inside the strait/Persian Gulf.
+// Sums oil-equivalent cargo across visible tankers, divides by world daily supply.
+// Drops as ships transit out of the bbox (lng < 50.5 or lng > 58 = exited strait).
+function _computeOilAtRiskPct() {
+  const vessels = (typeof window !== 'undefined' && window.SIM_VESSELS) ? window.SIM_VESSELS : [];
+  // Strait of Hormuz + Persian Gulf bounding box. Once a ship exits this, drop from count.
+  const STRAIT_BOX = { latLo: 24.0, latHi: 28.0, lngLo: 50.5, lngHi: 58.0 };
+  let totalBoe = 0;
+  for (const v of vessels) {
+    const lat = v._currentLat ?? v.lat;
+    const lng = v._currentLng ?? v.lng;
+    if (lat == null || lng == null) continue;
+    if (lat < STRAIT_BOX.latLo || lat > STRAIT_BOX.latHi ||
+        lng < STRAIT_BOX.lngLo || lng > STRAIT_BOX.lngHi) continue;  // exited strait
+    if (v._cleared) continue;  // explicitly removed (mine strike, sanctions hold, etc.)
+    const c = (v.cargo || '').toLowerCase();
+    // Crude/products in millions of barrels, e.g. "Saudi crude · 2.1M bbl"
+    const crudeMatch = c.match(/(\d+\.?\d*)\s*m\s*bbl/);
+    if (crudeMatch && /(crude|refined|condensate|products|fuel)/.test(c)) {
+      totalBoe += parseFloat(crudeMatch[1]) * 1_000_000;
+      continue;
+    }
+    // LNG metric tons (1 MT LNG ≈ 7.3 boe)
+    if (/lng/.test(c)) {
+      const mt = c.match(/(\d[\d,]*)\s*mt/);
+      if (mt) totalBoe += parseInt(mt[1].replace(/,/g, '')) * 7.3;
+      continue;
+    }
+    // LPG metric tons (1 MT LPG ≈ 11.6 boe)
+    if (/lpg/.test(c)) {
+      const mt = c.match(/(\d[\d,]*)\s*mt/);
+      if (mt) totalBoe += parseInt(mt[1].replace(/,/g, '')) * 11.6;
+      continue;
+    }
+    // Container/methanol/ballast = no oil-at-risk contribution
+  }
+  // World daily oil supply ≈ 100 MBD = 100M bbl. % at risk = boe / 100M × 100 = boe / 1M.
+  return Math.max(0, totalBoe / 1_000_000);
+}
+if (typeof window !== 'undefined') window._computeOilAtRiskPct = _computeOilAtRiskPct;
 
 // Sync the legacy state strip (escalation ladder + econ bar + coalition) to
 // activeExercise.indicators. Called from startExercise / renderActiveExercise / endExercise.
@@ -238,16 +281,16 @@ function syncLegacyStateStrip() {
   const ATRISK_BY_RUNG = [0, 3, 7, 12, 18, 21]; // HARASS → WAR
   const BPD_BY_RUNG    = [0.0, 0.6, 1.3, 2.2, 3.4, 3.9]; // M BPD held up
   if (!activeExercise) {
-    // Idle = current real-world conditions (April 2026): Brent $106, strait
-    // "largely closed" per Reuters/Fortune. War-risk shown as an extreme
-    // numeric (rather than SUSPENDED) so demo can show live up/down deltas
-    // when the user picks decisions.
+    // Idle = April 2026 baseline. Brent $106, war-risk elevated to 720 bps after
+    // Apr 18 incident, strait CONTESTED. OIL AT RISK is computed dynamically
+    // from the actual tankers visible on the AIS tracker (SIM_VESSELS).
     ladder.forEach(r => r.classList.remove('current'));
     if (ladder[0]) ladder[0].classList.add('current');
-    if (oil)  oil.textContent  = '0% world supply';
-    if (bpd)  bpd.textContent  = '$106 Brent · baseline';
-    if (ins)  ins.textContent  = '120 bps';
-    if (clos) clos.textContent = 'OPEN';
+    const pct = _computeOilAtRiskPct();
+    if (oil)  oil.textContent  = pct.toFixed(1) + '% world supply';
+    if (bpd)  bpd.textContent  = '$106 Brent · ' + pct.toFixed(1) + 'M BPD held up';
+    if (ins)  ins.textContent  = '720 bps';
+    if (clos) clos.textContent = 'CONTESTED';
     return;
   }
   const ind = activeExercise.indicators;

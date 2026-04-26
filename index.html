@@ -76,10 +76,12 @@
     .action-btn.yellow { color: var(--yellow); }
     .action-btn.purple { color: #aa66ff; }
     .action-btn.cyan   { color: #44ffee; }
+    .action-btn.red    { color: #ff5566; }
     #action-hint { flex:1; text-align:center; font-size:11px; color:var(--dim); letter-spacing:1px; line-height:2; }
 
     /* ── D-PAD ─────────────────────────────────────────────────── */
-    #dpad { display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; margin-left:6px; }
+    #dpad { display:none; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; margin-left:6px; }
+    #map-dpad { display:none !important; }
     #dpad-row { display:flex; gap:2px; }
     .dpad-btn {
       width:32px; height:32px; border:1px solid var(--border); background:transparent;
@@ -213,31 +215,31 @@
     .tr-name { flex: 1; color: var(--text); font-size: 12px; letter-spacing: 0.5px; }
     .tr-time { color: var(--dim); font-size: 11px; flex-shrink: 0; }
 
-    #intel-btn {
-      position: fixed; top: 80px; right: 360px; z-index: 30;
-      background: rgba(6,12,24,0.95); border: 1px solid #aa66ff; color: #aa66ff;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
-    }
-    #intel-btn:hover { background: rgba(170,102,255,0.15); }
-    #intel-btn.loading { opacity: 0.5; cursor: wait; }
+    /* VLM tools — stacked right-edge column, top to bottom: AIR INTEL → SURVEY → INTEL → SENTINEL */
     #airport-intel-btn {
-      position: fixed; top: 80px; right: 516px; z-index: 30;
+      position: fixed; top: 80px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #44ffcc;
-      font-family: inherit; font-size: 12px; letter-spacing: 0.05em;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #airport-intel-btn:hover { background: rgba(68,255,204,0.12); }
-    body.present #airport-intel-btn { right: 596px; }
     .airport-intel-tip { background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #cce8ff; font-family: monospace; font-size: 12px; }
     #survey-btn {
-      position: fixed; top: 80px; right: 430px; z-index: 30;
+      position: fixed; top: 116px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #ffaa44; color: #ffaa44;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #survey-btn:hover { background: rgba(255,170,68,0.15); }
     #survey-btn.loading { opacity: 0.5; cursor: wait; }
+    #intel-btn {
+      position: fixed; top: 152px; right: 360px; z-index: 30; min-width: 150px;
+      background: rgba(6,12,24,0.95); border: 1px solid #aa66ff; color: #aa66ff;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
+    }
+    #intel-btn:hover { background: rgba(170,102,255,0.15); }
+    #intel-btn.loading { opacity: 0.5; cursor: wait; }
     /* Full-screen intel report viewer */
     #intel-report-overlay {
       display: none; position: fixed;
@@ -304,10 +306,10 @@
 
     /* ── SENTINEL PANEL ──────────────────────────────────────── */
     #sentinel-btn {
-      position: fixed; top: 112px; right: 360px; z-index: 30;
+      position: fixed; top: 188px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #33aaff; color: #33aaff;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #sentinel-btn:hover { background: rgba(51,170,255,0.15); }
     #sentinel-btn.loading { opacity: 0.5; cursor: wait; }
@@ -786,8 +788,9 @@
   <button class="action-btn cyan"   id="btn-sim-transit"><span class="btn-icon">⏃</span><span class="btn-label">SIMULATE<br>BLUE TRANSIT</span><span class="btn-cost">DDG west-bound</span></button>
   <button class="action-btn green"  id="btn-exec-route"><span class="btn-icon">▶</span><span class="btn-label">EXECUTE<br>PAINTED ROUTE</span><span class="btn-cost">tanker + 2 escorts</span></button>
   <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
-  <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
   <button class="action-btn purple" id="btn-iran-intel"><span class="btn-icon">📋</span><span class="btn-label">IRGC<br>INTEL PINS</span><span class="btn-cost">VLM-style flags</span></button>
+  <button class="action-btn red"    id="btn-spawn-adv"><span class="btn-icon">🎲</span><span class="btn-label">SPAWN<br>ADVERSARIES</span><span class="btn-cost">Monte-Carlo roll</span></button>
+  <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
   <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
   <div id="dpad">
     <div id="dpad-row">
@@ -982,14 +985,14 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=141"></script>
-<script src="src/ship-taxonomy.js?v=141"></script>
-<script src="src/scenarios.js?v=141"></script>
-<script src="src/routes.js?v=141"></script>
-<script src="src/exercise.js?v=141"></script>
-<script src="src/exercise-ui.js?v=141"></script>
-<script src="src/routes-ui.js?v=141"></script>
-<script type="module" src="src/main.js?v=141"></script>
+<script src="src/historical-incidents.js?v=148"></script>
+<script src="src/ship-taxonomy.js?v=148"></script>
+<script src="src/scenarios.js?v=148"></script>
+<script src="src/routes.js?v=148"></script>
+<script src="src/exercise.js?v=148"></script>
+<script src="src/exercise-ui.js?v=148"></script>
+<script src="src/routes-ui.js?v=148"></script>
+<script type="module" src="src/main.js?v=148"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>
