@@ -2783,6 +2783,7 @@ if (typeof renderScenarioCards === 'function') {
   if (tA) tA.addEventListener('click', () => {
     document.body.classList.toggle('action-collapsed');
     tA.textContent = document.body.classList.contains('action-collapsed') ? '▲' : '▼';
+    if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
   });
   if (tP) tP.addEventListener('click', () => {
     document.body.classList.toggle('panel-collapsed');

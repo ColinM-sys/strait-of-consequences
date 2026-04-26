@@ -62,6 +62,9 @@ function dropMineMarkers(positions) {
 
 function startExercise(scenarioId) {
   activeExercise = new ExerciseState(scenarioId);
+  document.body.classList.add('exercise-active');
+  // Force Leaflet to redraw at new map width since panel just got wider
+  if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
   document.getElementById('exercise-scenario-list').style.display = 'none';
   const active = document.getElementById('exercise-active');
   active.style.display = 'flex';
@@ -125,6 +128,8 @@ function startExercise(scenarioId) {
 
 function endExercise() {
   activeExercise = null;
+  document.body.classList.remove('exercise-active');
+  if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
   document.getElementById('exercise-scenario-list').style.display = 'block';
   document.getElementById('exercise-active').style.display = 'none';
   document.getElementById('exercise-overlay').style.display = 'none';

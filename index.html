@@ -306,6 +306,36 @@
     /* Black "bar" residue under collapsed action-bar — kill action-bar's borders so nothing peeks through */
     body.action-collapsed #action-bar { border-top: none; border-right: none; }
 
+    /* Map extends to full screen height when bottom action bar is collapsed */
+    #map, #action-bar { transition: height 0.25s ease, width 0.25s ease, transform 0.25s ease; }
+    body.action-collapsed #map { height: 100%; }
+
+    /* AIS / vessel popups — cap height so they don't run off-screen */
+    .leaflet-popup-content { max-height: 60vh; overflow-y: auto; max-width: 360px !important; }
+    .ais-popup .leaflet-popup-content-wrapper { max-height: 60vh; }
+
+    /* Ship-cat-sidebar (STRIKE CONSEQUENCES) — shorter when exercise overlay covers bottom */
+    body.exercise-active #ship-cat-sidebar { max-height: 45vh !important; top: 70px !important; }
+
+    /* Wider sidebar while an exercise is active (more room for indicators + decision detail) */
+    body.exercise-active #panel       { width: 480px; }
+    body.exercise-active #map         { width: calc(100% - 480px); }
+    body.exercise-active #action-bar  { width: calc(100% - 480px); }
+    body.exercise-active #intel-report-overlay { right: 480px; }
+    body.exercise-active #toggle-panel  { right: 488px; }
+    body.exercise-active #toggle-action-bar { right: 488px; }
+    /* Right-rail action buttons sit at the new wider panel edge */
+    body.exercise-active #intel-btn,
+    body.exercise-active #survey-btn,
+    body.exercise-active #airport-intel-btn,
+    body.exercise-active #sentinel-btn,
+    body.exercise-active #btn-present,
+    body.exercise-active #btn-tour,
+    body.exercise-active #paint-toolbar,
+    body.exercise-active #paint-coords,
+    body.exercise-active #map-dpad { transform: translateX(-140px); }
+    body.exercise-active.panel-collapsed #panel { transform: translateX(480px); }
+
     /* Close ✕ for transit-log-panel */
     #transit-log-close {
       position: absolute; top: 4px; right: 6px; background: none; border: none;
