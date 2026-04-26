@@ -163,6 +163,87 @@
   let _oobModeActive = false;
   let _oobHiddenLayers = []; // markers we hid when entering OOB mode (for restore)
 
+  // After OOB lands, show a floating CTA: editable premise + GENERATE EXERCISE button.
+  // On click, calls /scenario/generate, injects result into window.SCENARIOS, and
+  // boots the existing 4-turn DIME+ exercise system on it.
+  function _showOobToExerciseCta(theater, oob) {
+    const blueNames = (oob.blue_force || []).slice(0, 3).map(u => u.unit || u.name).filter(Boolean).join(', ');
+    const redNames  = (oob.red_force  || []).slice(0, 3).map(u => u.unit || u.name).filter(Boolean).join(', ');
+    const seed = `In the ${theater}, ${oob.red_force?.length || 0} Red units (${redNames || 'IRGC FACs'}) confront ${oob.blue_force?.length || 0} Blue units (${blueNames || 'USN CSG'}) at the chokepoint.`;
+
+    let cta = document.getElementById('oob-to-exercise-cta');
+    if (cta) cta.remove();
+    cta = document.createElement('div');
+    cta.id = 'oob-to-exercise-cta';
+    cta.style.cssText = 'position:fixed;top:80px;right:380px;width:380px;z-index:9001;background:rgba(8,16,28,0.97);border:2px solid #44ffaa;border-left:6px solid #44ffaa;padding:14px 16px;color:#cce0ff;font-family:Courier New,monospace;font-size:11px;line-height:1.5;box-shadow:0 6px 24px rgba(68,255,170,0.30)';
+    cta.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="color:#44ffaa;font-size:11px;letter-spacing:2px;font-weight:bold">▶ GENERATE EXERCISE FROM THIS OOB</div>
+        <button id="oob-cta-close" style="background:none;border:1px solid #44ffaa66;color:#44ffaa;cursor:pointer;font-family:inherit;padding:1px 8px;font-size:14px">✕</button>
+      </div>
+      <div style="color:#88a0b8;font-size:10px;letter-spacing:1px;margin-bottom:6px">PREMISE — edit if needed:</div>
+      <textarea id="oob-cta-premise" style="width:100%;height:64px;background:rgba(255,255,255,0.04);border:1px solid #44ffaa44;color:#fff;font-family:Courier New,monospace;font-size:11px;line-height:1.4;padding:6px 8px;resize:vertical">${seed}</textarea>
+      <button id="oob-cta-go" style="width:100%;margin-top:10px;padding:10px;background:rgba(68,255,170,0.16);border:1.5px solid #44ffaa;color:#44ffaa;cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:2px;font-weight:bold">▶ GENERATE 4-TURN DIME+ EXERCISE</button>
+      <div id="oob-cta-status" style="margin-top:8px;font-size:10px;color:#88a0b8;min-height:14px"></div>
+    `;
+    document.body.appendChild(cta);
+
+    document.getElementById('oob-cta-close').addEventListener('click', () => cta.remove());
+    document.getElementById('oob-cta-go').addEventListener('click', async () => {
+      const premise = document.getElementById('oob-cta-premise').value.trim();
+      const status  = document.getElementById('oob-cta-status');
+      const goBtn   = document.getElementById('oob-cta-go');
+      if (!premise) { status.innerHTML = '<span style="color:#ff5566">Premise can\'t be empty.</span>'; return; }
+      goBtn.disabled = true;
+      const startT = performance.now();
+      status.innerHTML = `<span style="color:#66ddff">🛰 Llama 3.1 8B generating 4-turn scenario (~30-50s — bigger JSON than OOB)...</span>`;
+      // Tick a counter so user knows it's alive
+      const tickEvery = 1500;
+      const tick = setInterval(() => {
+        const sec = ((performance.now() - startT) / 1000).toFixed(0);
+        status.innerHTML = `<span style="color:#66ddff">🛰 generating... ${sec}s elapsed (5 decisions × 4 turns is a lot of JSON)</span>`;
+      }, tickEvery);
+      try {
+        const r = await fetch(API + '/scenario/generate', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ premise }),
+        });
+        const d = await r.json();
+        clearInterval(tick);
+        const totalT = ((performance.now() - startT) / 1000).toFixed(1);
+        if (!d.ok) {
+          status.innerHTML = `<span style="color:#ff5566">✗ ${d.error} after ${totalT}s: ${(d.raw||'').slice(0,200)}</span>`;
+          goBtn.disabled = false;
+          return;
+        }
+        const sc = d.scenario;
+        // Mark as AI-adjudicated and ensure ID is unique
+        sc.id = sc.id || ('ai-' + Date.now());
+        if (Array.isArray(sc.turns)) sc.turns.forEach(t => { t._aiGenerated = true; });
+        // Inject into the live SCENARIOS array used by the exercise system
+        if (typeof window.SCENARIOS !== 'undefined' && Array.isArray(window.SCENARIOS)) {
+          // Replace if same ID exists, else push
+          const idx = window.SCENARIOS.findIndex(s => s.id === sc.id);
+          if (idx >= 0) window.SCENARIOS[idx] = sc;
+          else window.SCENARIOS.push(sc);
+        }
+        status.innerHTML = `<span style="color:#44ffaa">✓ Scenario "${sc.title}" loaded — starting exercise...</span>`;
+        // Switch to EXERCISE tab + boot the new scenario
+        const exTab = document.getElementById('tab-exercise');
+        if (exTab) exTab.click();
+        if (typeof window.startExercise === 'function') {
+          setTimeout(() => { window.startExercise(sc.id); cta.remove(); }, 700);
+        }
+      } catch (e) {
+        clearInterval(tick);
+        status.innerHTML = `<span style="color:#ff5566">✗ ${e.message}</span>`;
+        goBtn.disabled = false;
+      }
+    });
+  }
+  // Expose globally so the on-the-fly button can call it without OOB
+  window._showOobToExerciseCta = _showOobToExerciseCta;
+
   function _enterOobMode(map, theater) {
     if (_oobModeActive) return;
     _oobModeActive = true;
@@ -204,6 +285,11 @@
     // Hide the banner
     const banner = document.getElementById('oob-mode-banner');
     if (banner) banner.style.display = 'none';
+    // Hide the OOB→Exercise CTA if still up
+    const cta = document.getElementById('oob-to-exercise-cta');
+    if (cta) cta.remove();
+    // Fly back to Strait of Hormuz
+    try { map.flyTo([26.5, 56.5], 8, { duration: 1.2 }); } catch (e) {}
   }
   function _wireOobGenerator() {
     const btn = document.getElementById('btn-ai-oob');
@@ -312,6 +398,9 @@
             try { map.setView(allLatLngs[0], 7); } catch (e) {}
           }
           modal.style.display = 'none';
+          // After OOB lands on the map, offer a "GENERATE EXERCISE FROM THIS OOB" CTA so
+          // the user can take the placed forces straight into a 4-turn DIME+ exercise.
+          _showOobToExerciseCta(theater, o);
         });
       } catch (e) {
         status.innerHTML = `<div style="color:#ff5566">✗ Network error: ${e.message}</div>`;

@@ -5,3 +5,4 @@ __pycache__/
 api/*.jpg
 api/*.png
 api/intel_db/
+api/chroma_db/

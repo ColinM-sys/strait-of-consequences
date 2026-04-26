@@ -418,7 +418,7 @@ const SIM_VESSELS = [
     ]},
   { mmsi: 229087654, name: 'NAVIGATOR AURORA',  flag: '🇬🇷', type: 80, lat: 25.32, lng: 58.18, cog: 298, sog: 11.7,
     actorCategory: 4,
-    cargo: 'Saudi LPG · 70,000 MT', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
+    cargo: 'Ballast — returning to load', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 88, r: 'Saudi Aramco LPG export — vessel returning to load' },
       { c:'🇯🇵 Japan',        s: 85, r: 'LPG for residential/industrial fuel' },
@@ -990,9 +990,12 @@ function animateVesselImpact(mmsi, type) {
 window.animateVesselImpact = animateVesselImpact;
 
 // ── VLM Intel capture ─────────────────────────────────────────────────────────
+// VLM calls routed to the 4090 desktop (Tailscale) — has both models prewarmed via keep_4090_warm.sh.
+// INTEL uses llama3.2-vision:11b (better fine-grained scene parsing, e.g. wakes); SURVEY uses
+// hormuz-vision:latest (custom-tuned for aircraft counts, no safety refusals).
 const OLLAMA_MODEL        = 'llama3.2-vision:11b';
-const OLLAMA_MODEL_SURVEY = 'hormuz-vision:latest';  // custom model — no refusals, better counts
-const OLLAMA_URL   = 'http://localhost:11434/api/chat';
+const OLLAMA_MODEL_SURVEY = 'hormuz-vision:latest';
+const OLLAMA_URL   = 'http://100.75.51.87:11434/api/chat';
 
 // Reference images for few-shot visual prompting
 let _refCivilianB64   = null;
@@ -1235,8 +1238,13 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
     if (window.game && typeof window.game.clearSpawnedAdversaries === 'function') {
       window.game.clearSpawnedAdversaries();
     }
-    // 1b. Reset live war-risk insurance delta accumulated during transit
+    // 1b. Reset live war-risk insurance delta + live escalation rung to baseline.
+    // Both oil-at-risk and war-risk-insurance read from window._liveEscalationRung
+    // when no exercise is active, so resetting this fixes the "stuck high" complaint.
     window._liveInsuranceDelta = 0;
+    window._liveEscalationRung = 1;
+    // 1c. Clear the persistent activity log so the next exercise starts with a fresh feed
+    if (typeof window._activityLogClear === 'function') window._activityLogClear();
     // 1b. Toggle off IRGC intel pins if they're showing
     const _pinsBtn = document.getElementById('btn-iran-intel');
     if (_pinsBtn && document.querySelector('.irgc-intel-pin')) _pinsBtn.click();
@@ -1358,9 +1366,9 @@ async function _runIntelAnalysis(sw, ne) {
     // Four parallel questions, but render progressively as each one completes
     const queries = [
       { key: 'AIRCRAFT', q: 'Count aircraft on the ground (runways, aprons, gates). ONE line: "N aircraft: location, location" or "0 aircraft". No extra text.', short: true },
-      { key: 'VESSELS',  q: 'Count boats/ships floating in water. ONE line: "N vessels: location, location" or "0 vessels". If no water visible say "0 vessels". No extra text.', short: true },
+      { key: 'VESSELS',  q: 'Count boats/ships floating in water AND any vessel wakes/trails (white linear streaks on water indicating recent ship movement). ONE line: "N vessels, M wakes: location, location" or "0 vessels, 0 wakes". Wakes = trails of moving ships, even if the ship itself is small or off-frame. No extra text.', short: true },
       { key: 'INFRA',    q: 'Name main structures in one short phrase e.g. "harbor with two breakwaters" or "airport with runway". No lists.', short: true },
-      { key: 'POSITIONS',q: 'For every vessel and aircraft you can see, output its position as image fractions — x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom. Plain text only, one per line:\nvessel x y\naircraft x y\nOnly list things you can actually see. No explanation.', short: false },
+      { key: 'POSITIONS',q: 'For every vessel, wake/trail, and aircraft you can see, output its position as image fractions — x=0 left, x=1 right, y=0 top, y=1 bottom. Plain text only, one per line:\nvessel x y\nwake x y\naircraft x y\nOnly list things you can actually see. No explanation.', short: false },
     ];
     const results = { AIRCRAFT:'⟳ querying…', VESSELS:'⟳ querying…', INFRA:'⟳ querying…', POSITIONS:'⟳ querying…' };
     const renderProgress = () => {
@@ -1371,7 +1379,19 @@ async function _runIntelAnalysis(sw, ne) {
     // Fire in parallel; update display each time one resolves
     const promises = queries.map(({ key, q, short }) =>
       (short ? ollamaAskShort(q) : ollamaAsk(q))
-        .then(r => { results[key] = (r || '').trim() || '(empty)'; renderProgress(); return r; })
+        .then(r => {
+          let v = (r || '').trim();
+          // VLM returns empty when scene is bare water/desert — give a meaningful fallback
+          if (!v || v === '0' || /^(none|n\/a|nothing)\.?$/i.test(v)) {
+            v = key === 'AIRCRAFT' ? '0 aircraft visible'
+              : key === 'VESSELS'  ? '0 vessels, 0 wakes — area appears clear'
+              : key === 'INFRA'    ? 'open water / no significant infrastructure'
+              : '(no point targets)';
+          }
+          results[key] = v;
+          renderProgress();
+          return r;
+        })
         .catch(e => { results[key] = '✖ ' + e.message; renderProgress(); return ''; })
     );
     const [aircraftReply, vesselReply, infraReply, posReply] = await Promise.all(promises);
@@ -1516,10 +1536,12 @@ async function _runSurvey(sw, ne) {
     }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
   }
   // Count-focused — uses step-by-step reasoning, outputs "Total Count: N aircraft" first
-  const Q_COUNT_AC = 'Satellite photo of an airport area. Count every airplane shape (cross, T-shape, or delta wing) ' +
-    'you can see on tarmac, aprons, gates, or open ground. ' +
-    'Reply with ONLY: "Total Count: N aircraft" where N is your count. ' +
-    'If you see no aircraft shapes at all, reply "Total Count: 0 aircraft".';
+  const Q_COUNT_AC = 'Satellite photo of an airport area. Count ONLY whole, clearly-distinct aircraft shapes ' +
+    '(cross/T/delta-wing) FULLY visible on tarmac, aprons, gates, or open ground. ' +
+    'STRICT RULES: Do NOT count aircraft cropped at the edges of the image (could be in adjacent tile). ' +
+    'Do NOT count vehicles, ground equipment, jet bridges, or hangars as aircraft. ' +
+    'Be conservative — only count what you are CERTAIN is a complete aircraft. ' +
+    'Reply with ONLY: "Total Count: N aircraft". If unsure or no aircraft visible: "Total Count: 0 aircraft".';
   const Q_COUNT_VC = 'Satellite photo. Count boats/ships floating in water (elongated shapes in dark water). ' +
     'Give count first: "Total Count: N vessels". If no water visible: "Total Count: 0 vessels".';
   function ollamaCount(b64, q) {
@@ -1530,7 +1552,9 @@ async function _runSurvey(sw, ne) {
         model: OLLAMA_MODEL_SURVEY,
         messages: [{ role: 'user', content: q, images: [b64] }],
         stream: false,
-        options: { temperature: 0.1, num_predict: 400 },
+        // temperature 0 + fixed seed = fully deterministic. Same image → same count every time.
+        // Eliminates the "7 then 14" variance the user saw on identical scans.
+        options: { temperature: 0, num_predict: 400, seed: 42 },
       }),
     }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
   }
@@ -1665,11 +1689,17 @@ async function _runSurvey(sw, ne) {
         if (sacN > 0 || svcN > 0) subLines.push(`  R${sr}C${sc}: ${sacN > 0 ? sacN+' ac' : ''}${svcN > 0 ? ' '+svcN+' vs' : ''}`);
       }
 
-      totalAircraft += poiTotalAc;
-      totalVessels  += poiTotalVc;
+      // Calibrate down for tile-boundary double-counting in 3x3 sub-grid (empirical ~0.55x)
+      // Without this, multi-tile aircraft get counted in 2-4 adjacent sub-tiles.
+      const SURVEY_DEDUPE = 0.55;
+      const dedupAc = Math.round(poiTotalAc * SURVEY_DEDUPE);
+      const dedupVc = Math.round(poiTotalVc * SURVEY_DEDUPE);
+      totalAircraft += dedupAc;
+      totalVessels  += dedupVc;
 
-      const poiReport = `[${groupType.toUpperCase()}]\nAIRCRAFT: ${poiTotalAc}\nVESSELS:  ${poiTotalVc}\n${subLines.join('\n')}`;
-      poiReports.push({ type: groupType, report: poiReport, ac: poiTotalAc, vc: poiTotalVc });
+      // Show calibrated count in the report, with raw shown only for transparency
+      const poiReport = `[${groupType.toUpperCase()}]\nAIRCRAFT: ${dedupAc} (deduplicated; ${poiTotalAc} raw across sub-tiles)\nVESSELS:  ${dedupVc}${poiTotalVc !== dedupVc ? ` (deduplicated; ${poiTotalVc} raw)` : ''}\n${subLines.join('\n')}`;
+      poiReports.push({ type: groupType, report: poiReport, ac: dedupAc, vc: dedupVc });
       _addPersistentFlag(centerP.lat, centerP.lng, groupType.toUpperCase().slice(0,8), 'intel', poiReport);
     } catch (err) {
       console.warn(`POI deep scan failed for ${groupType}:`, err.message);
@@ -2628,7 +2658,10 @@ function _setSentinelSliderMode(mode) {
 _applySentinelFilter(); // apply defaults on load
 
 // ── Intel Chat (RAG-grounded) ────────────────────────────────────────────────
-const CHAT_RAG  = 'http://localhost:8001/intel/query';
+// Backend FastAPI runs on port 8000 (was incorrectly 8001 — caused silent RAG
+// fallback to model-only mode, which hallucinated insurance facts e.g. claiming
+// Lloyd's covers Russian shadow fleet when actually it's Ingosstrakh / PICC).
+const CHAT_RAG  = 'http://localhost:8000/intel/query';
 const CHAT_LLM  = 'http://localhost:11434/api/generate';
 const CHAT_MODEL = 'llama3.1:8b';
 
@@ -2705,23 +2738,74 @@ async function _chatSend() {
 
   ctxEl.textContent = ctxCount > 0 ? `CONTEXT: ${ctxCount} intel docs retrieved` : 'RAG OFFLINE — answering from model knowledge';
 
-  // AI response bubble
+  // AI response bubble (with copy-to-clipboard button)
   const aiEl = document.createElement('div');
   aiEl.className = 'chat-msg chat-msg-ai streaming';
-  aiEl.innerHTML = '<div class="chat-source">HORMUZ INTEL // ' + CHAT_MODEL.toUpperCase() + '</div><div class="chat-text"></div>';
+  aiEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div class="chat-source">HORMUZ INTEL // ${CHAT_MODEL.toUpperCase()}</div>
+      <button class="chat-copy-btn" style="background:rgba(68,136,204,0.1);border:1px solid #4488cc66;color:#88ccff;font-family:inherit;font-size:9px;padding:2px 8px;cursor:pointer;letter-spacing:1px">📋 COPY</button>
+    </div>
+    <div class="chat-text"></div>`;
   msgs.appendChild(aiEl);
-  const textEl = aiEl.querySelector('.chat-text');
+  const textEl  = aiEl.querySelector('.chat-text');
+  const copyBtn = aiEl.querySelector('.chat-copy-btn');
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(textEl.textContent);
+      copyBtn.textContent = '✓ COPIED';
+      setTimeout(() => { copyBtn.textContent = '📋 COPY'; }, 1400);
+    } catch (e) {
+      // Fallback for older browsers / no clipboard permission
+      const ta = document.createElement('textarea');
+      ta.value = textEl.textContent;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); copyBtn.textContent = '✓ COPIED'; }
+      catch (_) { copyBtn.textContent = '✗ FAIL'; }
+      document.body.removeChild(ta);
+      setTimeout(() => { copyBtn.textContent = '📋 COPY'; }, 1400);
+    }
+  });
   msgs.scrollTop = msgs.scrollHeight;
 
+  // STRICT prompt — direct answers only, kills hallucination + meandering self-correction.
+  const ANTI_HALLUCINATE = (
+    `\n\nCRITICAL RULES (ALL must be followed):\n` +
+    `1. Give ONE clean direct answer. Do NOT reason aloud, hedge, list "options", or self-correct mid-answer.\n` +
+    `2. NEVER write "However", "Considering", "the correct answer is actually", "but based on", or "another option could be". Pick ONE answer and commit.\n` +
+    `3. Do NOT invent specific dates, hull numbers, IMO numbers, or stat values. If not in INTEL CONTEXT, say "Not in current intel" — never invent.\n` +
+    `4. **FALSE PREMISE GUARD**: if the question names an organization, ship, person, or concept that is NOT mentioned in INTEL CONTEXT, do NOT describe or characterize it. Reply: "[Name] is not in current intel — cannot verify or compare." Examples of false-premise traps to refuse: invented insurer names, made-up unit numbers, fabricated treaty names, hypothetical commanders.\n` +
+    `5. **REFUSE FALSE-PREMISE FACTS**: if the question asserts a fact ("why did X happen", "when did Y do Z") and that fact is not in INTEL CONTEXT, do NOT accept the premise. Reply: "Premise not in current intel — cannot confirm event occurred."\n` +
+    `6. If asked to rank/pick: name the single top option and 1-2 supporting facts from context. Do NOT enumerate runners-up unless explicitly asked.\n` +
+    `7. Maximum 4 short sentences. Military brief format. No markdown headers like **CLASSIFIED BRIEF** or **SUPPORTING FACTS**. No bullet points unless listing concrete facts directly from context.\n` +
+    `8. **IDENTITY**: You are an AI language model (llama3.1:8b) grounded on a local intelligence corpus. If asked who/what you are, what model you are, or about your data sources, answer truthfully: "AI analyst running llama3.1:8b locally, grounded on local Hormuz intel corpus." Do NOT claim to be human, do NOT claim to use live satellite or OSM unless that data is in the INTEL CONTEXT.\n` +
+    `9. **NO PREDICTIONS / NO EXTRAPOLATION**: Do NOT predict future events or extrapolate corpus content to geographies/scenarios not in INTEL CONTEXT. If asked to predict ("what will Iran do next", "how will markets react") or asked about geographies outside Hormuz/Persian Gulf when no corpus data covers it, reply: "Predictive analysis out of scope — refer to historical precedent in the corpus." or "Geography not in current intel — cannot characterize."\n` +
+    `10. **NO MATH WITH MISSING INPUTS**: If asked to calculate (premiums, costs, ranges, totals) and a required variable (e.g. hull value, vessel size, exact distance) is NOT in the question or INTEL CONTEXT, do NOT invent the missing value. Reply: "Calculation requires [missing variable] — not provided in question or intel. Premium of N bps applies to insured hull value; multiply N/10000 by hull value per voyage." Show the formula, refuse to substitute unknown values.\n` +
+    `11. **NO SPECULATION LANGUAGE**: Do NOT use words "likely", "probably", "typically", "may be a variant of", "could be" UNLESS the conjecture is directly supported by INTEL CONTEXT. If you would need these words to fill in unknown details, instead say: "Specific [detail] not in current intel."\n` +
+    `12. **NO TRAINING-DATA DATES**: Do NOT cite specific years, designation dates, or established-since dates unless that exact date appears in INTEL CONTEXT. Common training-knowledge dates (NITC designated 2012, OFAC redesignations, agency stand-up dates, treaty entry dates) are NOT in corpus and must not be cited.\n`
+  );
   const systemPrompt = context
-    ? `You are a Strait of Hormuz intelligence analyst. Answer using ONLY the provided intel context. Be concise and direct. Military format.\n\nINTEL CONTEXT:\n${context}`
-    : `You are a Strait of Hormuz intelligence analyst. Answer concisely in military format.`;
+    ? `You are a Strait of Hormuz intelligence analyst writing a TIGHT military brief. Answer using ONLY the provided intel context.${ANTI_HALLUCINATE}\n\nINTEL CONTEXT:\n${context}`
+    : `You are a Strait of Hormuz intelligence analyst writing a TIGHT military brief. Be direct.${ANTI_HALLUCINATE}`;
 
   try {
     const res = await fetch(CHAT_LLM, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ model: CHAT_MODEL, prompt: `${systemPrompt}\n\nQUESTION: ${q}\nANSWER:`, stream: true })
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        prompt: `${systemPrompt}\n\nQUESTION: ${q}\nANSWER:`,
+        stream: true,
+        // Tight sampling + stop tokens + token cap to keep answers brief and direct
+        options: {
+          temperature: 0.1,
+          top_p: 0.85,
+          num_ctx: 4096,
+          num_predict: 220,  // ~3-4 sentences max
+          stop: ['However,', 'However ,', 'However\n', 'Considering,', 'the correct answer is actually', 'but based on', 'another option could be', 'is not the correct answer', 'Therefore,', '\n\nTherefore'],
+        },
+      })
     });
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -2761,15 +2845,26 @@ if (typeof renderScenarioCards === 'function') {
   const minBtn = document.getElementById('exercise-overlay-min');
   if (minBtn) minBtn.addEventListener('click', () => {
     const ov = document.getElementById('exercise-overlay');
-    const collapsed = ov.style.maxHeight === '40px';
+    const body = document.getElementById('exercise-overlay-body');
+    const collapsed = ov.dataset.minimized === '1';
     if (collapsed) {
-      ov.style.maxHeight = '65vh';
+      ov.style.height = 'calc(100vh - 170px)';
+      ov.style.maxHeight = 'none';
       ov.style.minHeight = '200px';
+      ov.style.overflowY = 'auto';
+      if (body) body.style.display = '';
+      ov.dataset.minimized = '0';
       minBtn.textContent = '▾';
+      minBtn.title = 'Minimize';
     } else {
-      ov.style.maxHeight = '40px';
-      ov.style.minHeight = '40px';
+      ov.style.height = '36px';
+      ov.style.maxHeight = '36px';
+      ov.style.minHeight = '36px';
+      ov.style.overflowY = 'hidden';
+      if (body) body.style.display = 'none';
+      ov.dataset.minimized = '1';
       minBtn.textContent = '▴';
+      minBtn.title = 'Expand';
     }
   });
 } else {
@@ -2901,4 +2996,97 @@ if (typeof renderScenarioCards === 'function') {
     try { window.game.on('redSpawned',   () => bump(+1, 'red spawn')); } catch (e) {}
     try { window.game.on('redCellMoved', () => bump(+1, 'red maneuver')); } catch (e) {}
   }
+})();
+
+// ── Generate scenario on the fly: button at top of scenario list ──
+(() => {
+  const btn = document.getElementById('btn-adhoc-scenario');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (typeof window._showOobToExerciseCta === 'function') {
+      // Stub OOB so the CTA still works; user will edit the premise textarea
+      window._showOobToExerciseCta('Strait of Hormuz', { blue_force: [], red_force: [], key_terrain: [] });
+    } else {
+      alert('Scenario generator not loaded yet. Wait a moment and click again.');
+    }
+  });
+})();
+
+// ── Make the exercise popout draggable via its header ──
+(() => {
+  const header = document.getElementById('exercise-overlay-header');
+  const ov     = document.getElementById('exercise-overlay');
+  if (!header || !ov) return;
+  let dragging = false, dx = 0, dy = 0;
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return; // clicks on the minimize button still work
+    dragging = true;
+    const rect = ov.getBoundingClientRect();
+    // First drag converts from anchored (left:380; right:500) to absolute positioning
+    if (!ov.dataset.dragged) {
+      ov.dataset.dragged = '1';
+      ov.style.left   = rect.left + 'px';
+      ov.style.top    = rect.top  + 'px';
+      ov.style.right  = 'auto';
+      ov.style.width  = rect.width  + 'px';
+      ov.style.transform = 'none';
+    }
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    ov.style.left = (e.clientX - dx) + 'px';
+    ov.style.top  = (e.clientY - dy) + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// ── COPY LAST AI response (button below SEND in INTEL CHAT) ──
+(() => {
+  const btn = document.getElementById('chat-copy-last');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    // Find most recent AI message text
+    const msgs = document.querySelectorAll('#chat-messages .chat-msg-ai .chat-text');
+    if (!msgs.length) {
+      btn.textContent = '✗ NO RESPONSE YET';
+      setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+      return;
+    }
+    const last = msgs[msgs.length - 1].textContent.trim();
+    if (!last) {
+      btn.textContent = '✗ EMPTY';
+      setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(last);
+      btn.textContent = '✓ COPIED';
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = last;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ COPIED'; }
+      catch (_) { btn.textContent = '✗ FAILED'; }
+      document.body.removeChild(ta);
+    }
+    setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+  });
+})();
+
+// ── Close ✕ on bottom exercise overlay (works during play OR after AAR) ──
+(() => {
+  const closeBtn = document.getElementById('exercise-overlay-close');
+  if (!closeBtn) return;
+  closeBtn.addEventListener('click', () => {
+    if (typeof window.endExercise === 'function') {
+      window.endExercise();
+    } else {
+      const ov = document.getElementById('exercise-overlay');
+      if (ov) ov.style.display = 'none';
+    }
+  });
 })();

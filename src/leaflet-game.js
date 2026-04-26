@@ -1997,21 +1997,60 @@ function _bumpWarRisk(deltaBps, opts = {}) {
 
 // ── Stacking transit-log: single container so banners don't overlap ──────────
 function _transitLog(html, accent = '#44ccff', dwellMs = 10000) {
-  let log = document.getElementById('transit-log');
-  if (!log) {
-    log = document.createElement('div');
-    log.id = 'transit-log';
-    log.style.cssText = 'position:fixed;bottom:140px;left:20px;z-index:600;display:flex;flex-direction:column-reverse;gap:6px;max-width:540px;pointer-events:none';
-    document.body.appendChild(log);
+  // Bottom toasts are disabled — alerts go ONLY to the persistent left-side activity log
+  // so they don't stack and block the map view during transit simulations.
+  _activityLogAppend(html, accent);
+}
+
+function _activityLogAppend(html, accent = '#44ccff') {
+  let panel = document.getElementById('activity-log-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'activity-log-panel';
+    panel.style.cssText = 'position:fixed;top:80px;left:12px;z-index:55;width:340px;max-height:calc(100vh - 280px);overflow-y:auto;background:rgba(0,8,16,0.94);border:1px solid #44ccff66;border-left:4px solid #44ccff;color:#cce0ff;font-family:Courier New,monospace;font-size:10px;line-height:1.4;box-shadow:0 4px 18px rgba(0,0,0,0.7);display:none;flex-direction:column';
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(68,204,255,0.10);border-bottom:1px solid #44ccff44;flex-shrink:0;gap:6px">
+        <div style="color:#44ccff;font-size:10px;letter-spacing:2px;font-weight:bold;flex:1">⚓ ACTIVITY LOG</div>
+        <button id="activity-log-min" title="Minimize / expand" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 8px;cursor:pointer;font-family:inherit;font-size:11px">▾</button>
+        <button id="activity-log-clear" title="Clear all entries" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 8px;cursor:pointer;font-family:inherit;font-size:10px;letter-spacing:1px">CLEAR</button>
+        <button id="activity-log-close" title="Close panel" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 7px;cursor:pointer;font-family:inherit;font-size:11px">✕</button>
+      </div>
+      <div id="activity-log-body" style="flex:1;overflow-y:auto;padding:6px 10px"></div>`;
+    document.body.appendChild(panel);
+    const closeBtn = document.getElementById('activity-log-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+    const clearBtn = document.getElementById('activity-log-clear');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      const b = document.getElementById('activity-log-body');
+      if (b) b.innerHTML = '';
+    });
+    const minBtn = document.getElementById('activity-log-min');
+    if (minBtn) minBtn.addEventListener('click', () => {
+      const b = document.getElementById('activity-log-body');
+      if (!b) return;
+      const collapsed = b.style.display === 'none';
+      b.style.display = collapsed ? '' : 'none';
+      minBtn.textContent = collapsed ? '▾' : '▴';
+    });
   }
+  panel.style.display = 'flex';
+  const body = document.getElementById('activity-log-body');
+  if (!body) return;
+  const t = new Date().toLocaleTimeString('en-US', { hour12: false });
   const row = document.createElement('div');
-  row.style.cssText = `background:rgba(0,8,16,0.94);color:${accent};padding:7px 16px;border:1px solid ${accent}88;border-left:4px solid ${accent};font-family:Courier New,monospace;font-size:11px;letter-spacing:1.3px;box-shadow:0 4px 14px rgba(0,0,0,0.6);transition:opacity 0.7s ease;opacity:1;line-height:1.4`;
-  row.innerHTML = html;
-  log.appendChild(row);
-  // Cap concurrent rows to 8 — oldest gets removed when 9th arrives
-  while (log.children.length > 8) log.firstChild.remove();
-  setTimeout(() => { row.style.opacity = '0'; }, dwellMs);
-  setTimeout(() => { row.remove(); }, dwellMs + 800);
+  row.style.cssText = `border-left:2px solid ${accent}88;padding:4px 8px;margin-bottom:4px;background:rgba(255,255,255,0.02)`;
+  row.innerHTML = `<div style="color:${accent};font-size:9px;letter-spacing:1.5px">${t}</div><div style="color:#cce0ff;font-size:10px;margin-top:1px">${html}</div>`;
+  body.insertBefore(row, body.firstChild);
+}
+
+if (typeof window !== 'undefined') {
+  window._activityLogAppend = _activityLogAppend;
+  window._activityLogClear = () => {
+    const body = document.getElementById('activity-log-body');
+    if (body) body.innerHTML = '';
+    const panel = document.getElementById('activity-log-panel');
+    if (panel) panel.style.display = 'none';
+  };
 }
 
 // ── Destroyer sweep + engagement helpers (used by executePaintedRoute) ───────
@@ -2655,4 +2694,11 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
   _renderAAR(this._combatState, { aborted: !!this._abortRoute });
   if (this._emit) this._emit('info', this._abortRoute ? 'Transit ABORTED.' : 'Blue formation transit complete.');
   this._abortRoute = false;
+  // Reset war-risk insurance delta + escalation rung back to idle baseline so the next
+  // simulation starts fresh. Oil-at-risk reads from the rung so it resets too.
+  if (typeof window !== 'undefined') {
+    window._liveInsuranceDelta = 0;
+    window._liveEscalationRung = 1;
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  }
 };

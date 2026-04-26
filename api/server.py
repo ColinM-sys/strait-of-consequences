@@ -267,11 +267,38 @@ async def query_intel(q: IntelQuery):
     # ── Text-semantic mode (Intel Chat RAG) ──────────────────────────────────
     if q.query:
         try:
-            results = _intel_col.query(
+            # Detect doctrine/strategy/insurance/incident-style queries — for these,
+            # exclude the 864 OSM-base entries (which only carry geo metadata, no topic)
+            # so doctrine/insurance/incident docs aren't drowned by base-name noise.
+            qlow = q.query.lower()
+            doctrine_kw = ('doctrine', 'roe', 'rules of engagement', 'off-ramp', 'offramp',
+                           'a2/ad', 'a2ad', 'contingency', 'insurance', 'sanction',
+                           'shadow fleet', 'tanker war', 'earnest will', 'praying mantis',
+                           'lloyd', 'jwc', 'p&i', 'ofac', 'ingosstrakh', 'picc', 'rnrc',
+                           'crisis', 'escalation', 'ladder', 'imsc', 'emasoh', 'ctf-152',
+                           'iranian proxy', 'houthi', 'mda', 'maritime domain', 'stena',
+                           'fujairah', 'bridgeton', 'samuel b. roberts', 'limpet')
+            need_filter = any(k in qlow for k in doctrine_kw)
+            # Whitelist topics — anything with a real topic field (i.e., NOT the 864 OSM bases
+            # that have no topic metadata). ChromaDB $in matches exact strings.
+            DOCTRINE_TOPICS = [
+                "hormuz_contingency", "roe_doctrine", "iranian_a2ad", "escalation_offramps",
+                "coalition_warfighting", "earnest_will_lessons", "iranian_proxy_framework",
+                "mda_gaps", "crisis_stability", "sanctions_enforcement",
+                "war_risk_insurance", "shadow_fleet_sanctions", "maritime_governance",
+                "recent_incidents", "ofac_sanctions", "eu_sanctions",
+            ]
+            where_clause = {"topic": {"$in": DOCTRINE_TOPICS}} if need_filter else None
+
+            kwargs = dict(
                 query_texts=[q.query],
                 n_results=min(q.n, _intel_col.count() or 1),
                 include=["documents", "metadatas", "distances"],
             )
+            if where_clause:
+                kwargs["where"] = where_clause
+
+            results = _intel_col.query(**kwargs)
             docs  = results["documents"][0] if results["documents"] else []
             metas = results["metadatas"][0]  if results["metadatas"]  else []
             dists = results["distances"][0]  if results["distances"]  else []
@@ -342,7 +369,7 @@ def _llm_json(system: str, user: str, temp: float = 0.85, num_predict: int = 120
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
                     ],
-                    "options": {"temperature": temp, "num_predict": num_predict, "num_ctx": 6144,
+                    "options": {"temperature": temp, "num_predict": num_predict, "num_ctx": 3072,
                                 "seed": int.from_bytes(_os.urandom(4), 'big')},
                     "format": "json",
                 })
@@ -355,20 +382,20 @@ def _llm_json(system: str, user: str, temp: float = 0.85, num_predict: int = 120
     return None, last_err or "no valid JSON after retries"
 
 
-SCENARIO_GEN_SYSTEM = """You are a senior wargame scenario designer at NWC Newport. Generate a complete 4-turn Hormuz strait wargame scenario from a one-line premise.
+SCENARIO_GEN_SYSTEM = """Generate a 4-turn Hormuz wargame. Output ONLY JSON. Be terse but COMPLETE.
 
-CONSTRAINTS:
-- Reference REAL geography: Bandar Abbas, Larak, Qeshm, Abu Musa, Greater/Lesser Tunb, Fujairah, Khor Fakkan, Ras Tanura, Jebel Ali, Kharg Island, Bandar Lengeh, Mina al Fahal.
-- Reference REAL forces: USN CSG (CVN-76 / DDG-102 / DDG-119 / CG-62), IRGC FACs (Boghammar, Peykaap), IRIN frigates (Jamaran-class), Ghadir-class submarines.
-- Reference REAL economic actors: Lloyd's JWC, OFAC, Aramco, ADNOC, CTF 152.
-- Indicators must be plausible: oilPrice 80-180, warRiskInsurance 100-2500, escalationRung 0-6.
-- Each turn's 5 decisions must cover ALL 5 lanes: DIPLOMATIC / INFORMATION / MILITARY / ECONOMIC / INTELLIGENCE.
-- Decision titles: ACTION-VERB + SPECIFIC ASSET (e.g., "Forward-deploy DDG-102 within 3 nm of Larak").
+CRITICAL: turns array MUST contain EXACTLY 4 entries. Not 1, not 2, not 3 — exactly 4.
+Each turn MUST have 3 decisions (DIPLOMATIC, MILITARY, ECONOMIC).
 
-OUTPUT JSON SHAPE:
-{"id":"kebab-id","title":"ALL CAPS","rung":"HARASS|SEIZURE|MINING|STRIKE|CLOSURE","rungColor":"#hex","threat":"...","summary":"...","keyVessels":[],"initialIndicators":{"escalationRung":int,"oilPrice":int,"warRiskInsurance":int,"allianceCohesion":60,"attributionConfidence":60,"iranCoercion":50},"turns":[{"inject":"...","decisions":[{"lane":"DIPLOMATIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},...5 cards],...4 turns]}
+Real names only: Bandar Abbas, Larak, Fujairah, Ras Tanura, USN CSG, IRGC Boghammar, Lloyd's JWC, Aramco. Ranges: oilPrice 80-180, warRiskInsurance 100-2500, escalationRung 0-6.
 
-Output ONLY valid JSON. No markdown."""
+SHAPE (note 4 turn entries in turns array):
+{"id":"kebab","title":"CAPS","rung":"HARASS|SEIZURE|MINING|STRIKE|CLOSURE","rungColor":"#hex","threat":"...","summary":"...","keyVessels":[],"initialIndicators":{"escalationRung":2,"oilPrice":110,"warRiskInsurance":900,"allianceCohesion":60,"attributionConfidence":60,"iranCoercion":50},"turns":[
+  {"inject":"T1 incident inject","decisions":[{"lane":"DIPLOMATIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},{"lane":"MILITARY","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},{"lane":"ECONOMIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}}]},
+  {"inject":"T2 escalation inject","decisions":[3 decisions same shape]},
+  {"inject":"T3 markets inject","decisions":[3 decisions same shape]},
+  {"inject":"T4 off-ramp inject","decisions":[3 decisions same shape]}
+]}"""
 
 
 class ScenarioGenRequest(BaseModel):
@@ -378,13 +405,13 @@ class ScenarioGenRequest(BaseModel):
 @app.post("/scenario/generate")
 async def post_scenario_generate(req: ScenarioGenRequest):
     user_prompt = (
-        f"Premise: {req.premise.strip()}\n\n"
-        f"Generate the full scenario JSON. 4 turns. 5 DIME+ decisions per turn. "
-        f"Make Turn 1 the inciting incident, Turn 2 escalation pressure, "
-        f"Turn 3 international response + insurance market reaction, "
-        f"Turn 4 the off-ramp / escalation decision point."
+        f"Premise: {req.premise.strip()}\n"
+        "Generate ALL 4 turns: T1 incident · T2 escalation · T3 markets · T4 off-ramp. "
+        "Each turn has 3 decisions (DIPLOMATIC, MILITARY, ECONOMIC). "
+        "REMINDER: turns array length must be exactly 4. Do not stop after T1."
     )
-    parsed, raw = _llm_json(SCENARIO_GEN_SYSTEM, user_prompt, temp=0.95, num_predict=4000)
+    # 2400 tokens to fit 4 full turns. Was 1700 — caused truncation to 1 turn.
+    parsed, raw = _llm_json(SCENARIO_GEN_SYSTEM, user_prompt, temp=0.7, num_predict=2400)
     if not parsed:
         return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:500]}
     if "turns" not in parsed or len(parsed.get("turns", [])) != 4:
@@ -454,6 +481,47 @@ class AarRequest(BaseModel):
     indicators_after: dict
 
 
+EXERCISE_AAR_SYSTEM = """You are a wargame after-action analyst. Write a tight, grounded narrative about what happened in the exercise.
+
+STRICT RULES:
+- Reference ONLY decisions and indicators provided. Do NOT invent additional events, ship names, dates, or quotes.
+- Cite the actual decision titles + lanes provided.
+- Cite indicator changes by name + numeric delta.
+- 4-6 short sentences total. No bullet points. No headings.
+- Tone: terse, doctrinal, like a real AAR officer.
+
+Output JSON: {"narrative":"..."}"""
+
+
+class ExerciseAarRequest(BaseModel):
+    scenario_title: str
+    scenario_summary: str
+    decisions: List[dict]   # [{turn, lane, title, assessment}]
+    indicators_before: dict
+    indicators_after: dict
+
+
+@app.post("/exercise/aar")
+async def post_exercise_aar(req: ExerciseAarRequest):
+    decision_lines = "\n".join(
+        f"  T{d.get('turn')}: {d.get('lane')} — {d.get('title')}"
+        for d in (req.decisions or [])
+    ) or "  (no decisions)"
+    deltas = {k: req.indicators_after.get(k, 0) - req.indicators_before.get(k, 0) for k in req.indicators_before}
+    user_prompt = (
+        f"Scenario: {req.scenario_title}\n"
+        f"Summary: {req.scenario_summary}\n\n"
+        f"Decisions Blue made (in order):\n{decision_lines}\n\n"
+        f"Indicators before → after:\n"
+        + "\n".join(f"  {k}: {req.indicators_before[k]} → {req.indicators_after.get(k, 0)} ({'+' if deltas[k]>=0 else ''}{deltas[k]})" for k in req.indicators_before)
+        + "\n\nWrite the AAR narrative now (4-6 sentences). Reference specific decisions and indicator deltas. Do not invent."
+    )
+    parsed, raw = _llm_json(EXERCISE_AAR_SYSTEM, user_prompt, temp=0.4, num_predict=500)
+    if not parsed or "narrative" not in parsed:
+        return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:300]}
+    return {"ok": True, "narrative": parsed["narrative"]}
+
+
 @app.post("/aar/observations")
 async def post_aar_observations(req: AarRequest):
     events_summary = "\n".join(f"  - [{e.get('type')}] {_json.dumps({k: v for k, v in e.items() if k not in ('type', 't')})}" for e in (req.events or [])) or "  (none)"
@@ -473,11 +541,12 @@ async def post_aar_observations(req: AarRequest):
 
 
 OOB_SYSTEM = """You are a defense intelligence analyst writing an Order of Battle dossier.
-Generate a realistic regional OOB for the user's specified theater.
 
-OUTPUT JSON: {"theater":"...","blue_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"red_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"key_terrain":[{"name":"...","lat":float,"lng":float,"significance":"..."}]}
+CRITICAL: Generate the OOB for THE EXACT theater the user names. Do NOT substitute another theater. Do NOT default to Hormuz/Persian Gulf if the user names Taiwan, South China Sea, Red Sea, Bab el-Mandeb, Eastern Mediterranean, etc. The "theater" field in the output MUST match the user's input verbatim. Lat/lng coordinates MUST fall within that theater's actual geography.
 
-Use real coordinates. Use real platform names. Output ONLY valid JSON."""
+OUTPUT JSON: {"theater":"<user's exact input>","blue_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"red_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"key_terrain":[{"name":"...","lat":float,"lng":float,"significance":"..."}]}
+
+Use real coordinates within the user's theater. Use real platform names appropriate for forces in that theater. Output ONLY valid JSON."""
 
 
 class OobRequest(BaseModel):

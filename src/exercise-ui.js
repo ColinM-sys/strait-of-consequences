@@ -130,6 +130,8 @@ function endExercise() {
   activeExercise = null;
   document.body.classList.remove('exercise-active');
   if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
+  // Clear persistent activity log — fresh start for next exercise
+  if (typeof window._activityLogClear === 'function') window._activityLogClear();
   document.getElementById('exercise-scenario-list').style.display = 'block';
   document.getElementById('exercise-active').style.display = 'none';
   document.getElementById('exercise-overlay').style.display = 'none';
@@ -805,20 +807,32 @@ function renderOverlay() {
   }
 
   // Decisions FIRST so the user never has to scroll past sitrep history to pick.
-  // Sitrep history shown below, collapsed under a small label.
-  const sitrepWrapped = sitrepHtml
-    ? `<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #ff660044">
-         <div style="color:#996644;font-size:9px;letter-spacing:2px;margin-bottom:6px">▾ PRIOR TURNS — SITREP HISTORY</div>
-         ${sitrepHtml}
-       </div>`
-    : '';
-  body.innerHTML = keyVesselsHtml + nextDecisionsHtml + sitrepWrapped;
+  body.innerHTML = keyVesselsHtml + nextDecisionsHtml;
   // Auto-scroll the overlay back to the TOP so new decisions are immediately visible
   const overlayEl = document.getElementById('exercise-overlay');
   if (overlayEl) requestAnimationFrame(() => { overlayEl.scrollTop = 0; });
-  // Sidebar decision list is now redundant — clear it to avoid the user picking in two places
+  // Right sidebar gets the per-decision sitrep history — full assessment text per turn
   const sidebarDec = document.getElementById('exercise-decisions');
-  if (sidebarDec) sidebarDec.innerHTML = '<div style="color:#7a8896;font-size:11px;line-height:1.5;padding:8px;letter-spacing:1px">▾ Pick a decision in the bottom overlay (centered).</div>';
+  if (sidebarDec) {
+    if (ex.sitrep.length === 0) {
+      sidebarDec.innerHTML = '<div style="color:#7a8896;font-size:11px;line-height:1.5;padding:8px;letter-spacing:1px">▾ Pick a decision in the bottom overlay. Each pick\'s assessment will appear here.</div>';
+    } else {
+      const sidebarLaneColors = { DIPLOMATIC:'#ffcc66', INFORMATION:'#cc66ff', MILITARY:'#ff6666', ECONOMIC:'#66ccff', INTELLIGENCE:'#66ff99' };
+      sidebarDec.innerHTML = `
+        <div style="color:#ff6600;font-size:10px;letter-spacing:2px;padding:8px 10px 6px">// EXERCISE OUTPUT — DECISION ASSESSMENTS //</div>
+        ${ex.sitrep.slice().reverse().map(s => {
+          const c = sidebarLaneColors[s.lane] || '#cccccc';
+          return `
+            <div style="border-left:3px solid ${c};padding:8px 10px;margin:0 8px 8px 8px;background:rgba(255,255,255,0.02)">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px">
+                <div style="color:${c};font-size:9px;letter-spacing:2px;font-weight:bold">T${s.turn} · ${s.lane}</div>
+              </div>
+              <div style="color:#fff;font-size:11px;font-weight:bold;margin-bottom:4px;line-height:1.3">${s.title}</div>
+              <div style="color:#cce0ff;font-size:10px;line-height:1.55">${formatAssessment(s.assessment)}</div>
+            </div>`;
+        }).join('')}`;
+    }
+  }
   // Wire the inline decision cards so picking from the bottom overlay works just like the sidebar
   body.querySelectorAll('.overlay-dec-card').forEach(card => {
     card.addEventListener('mouseenter', () => { card.style.background = 'rgba(255,255,255,0.08)'; });
@@ -888,18 +902,133 @@ function renderAAR() {
       </div>`;
   }).join('');
 
+  // Build narrative — explains WHY the outcome happened based on decision pattern + deltas
+  const laneCounts = { DIPLOMATIC:0, INFORMATION:0, MILITARY:0, ECONOMIC:0, INTELLIGENCE:0 };
+  ex.sitrep.forEach(s => { if (laneCounts[s.lane] !== undefined) laneCounts[s.lane]++; });
+  const dominant = Object.entries(laneCounts).sort((a,b) => b[1]-a[1])[0];
+  const dominantLane = dominant && dominant[1] > 0 ? dominant[0] : null;
+
+  const dEsc = (indN.escalationRung || 0) - (ind0.escalationRung || 0);
+  const dCoh = (indN.allianceCohesion || 0) - (ind0.allianceCohesion || 0);
+  const dAttr = (indN.attributionConfidence || 0) - (ind0.attributionConfidence || 0);
+  const dCoer = (indN.iranCoercion || 0) - (ind0.iranCoercion || 0);
+  const dOil = (indN.oilPrice || 0) - (ind0.oilPrice || 0);
+  const dIns = (indN.warRiskInsurance || 0) - (ind0.warRiskInsurance || 0);
+
+  // Composite score: alliance + attribution good ↑, escalation + coercion + oil + insurance bad ↑
+  const score = dCoh + dAttr - dEsc*8 - dCoer - Math.max(0, dOil)*2 - Math.max(0, dIns)/40;
+
+  let verdict, verdictColor, headline;
+  if (score >= 12) { verdict = 'BLUE PREVAILED'; verdictColor = '#44cc88'; headline = 'You contained the crisis. Allies held, attribution caught up to operational reality, and Tehran\'s coercion didn\'t advance further than the opening rung.'; }
+  else if (score >= 0) { verdict = 'STALEMATE'; verdictColor = '#ffcc44'; headline = 'You held the line but didn\'t dislodge Red. The crisis enters a prolonged contestation phase — operations continue with elevated friction, and Red retains the option to re-pressure.'; }
+  else if (score >= -10) { verdict = 'RED ADVANTAGE'; verdictColor = '#ff8844'; headline = 'Your decision tempo lagged Red\'s adaptation. Attribution didn\'t catch up fast enough, and the crisis hardened. Replay would face a degraded posture and second-order pressure on commercial dependents.'; }
+  else { verdict = 'STRATEGIC FAILURE'; verdictColor = '#ff3344'; headline = 'Red set the tempo end-to-end. The exercise ends with normalized adversary access to the chokepoint, eroded alliance cohesion, and a precedent that Tehran-aligned actors could re-run.'; }
+
+  const causes = [];
+  if (dominantLane === 'DIPLOMATIC') causes.push('Your <b style="color:#ffcc66">DIPLOMATIC</b>-weighted approach prioritized coalition cohesion. Allies engaged but evidence had to catch up — attribution rose by ' + (dAttr >= 0 ? '+' : '') + dAttr + ' over the exercise.');
+  if (dominantLane === 'MILITARY') causes.push('Your <b style="color:#ff6666">MILITARY</b>-weighted picks raised the deterrent posture but bumped the escalation ladder ' + (dEsc >= 0 ? '+' : '') + dEsc + ' rungs. Cohesion shifted ' + (dCoh >= 0 ? '+' : '') + dCoh + ' as allies read the move.');
+  if (dominantLane === 'INTELLIGENCE') causes.push('Your <b style="color:#66ff99">INTELLIGENCE</b>-weighted approach prioritized evidence quality. Attribution moved ' + (dAttr >= 0 ? '+' : '') + dAttr + ' but the slower tempo gave Red a window to reframe events publicly.');
+  if (dominantLane === 'ECONOMIC') causes.push('Your <b style="color:#66ccff">ECONOMIC</b>-weighted picks pressured Iranian buyers + insurance markets. Coercion shifted ' + (dCoer >= 0 ? '+' : '') + dCoer + ' and oil moved $' + (dOil >= 0 ? '+' : '') + dOil + '.');
+  if (dominantLane === 'INFORMATION') causes.push('Your <b style="color:#cc66ff">INFORMATION</b>-weighted approach contested the narrative. Public attribution rose ' + (dAttr >= 0 ? '+' : '') + dAttr + ' but Iranian coercion hardened ' + (dCoer >= 0 ? '+' : '') + dCoer + ' as Tehran felt singled out.');
+
+  if (dEsc >= 2) causes.push('The escalation ladder climbed +' + dEsc + ' rungs (' + rungs[ind0.escalationRung] + ' → ' + rungs[indN.escalationRung] + '). Combat events during transit drove most of this.');
+  if (dIns >= 200) causes.push('War-risk insurance jumped +' + dIns + ' bps. Lloyd\'s and Continental syndicates already priced the strait as elevated risk; this exercise pushed several into <b>SUSPENDED</b> territory.');
+  if (dOil >= 8) causes.push('Brent rose $' + dOil + '/bbl — the strait disruption priced through to spot markets within the exercise window.');
+  if (dCoh <= -8) causes.push('Alliance cohesion dropped ' + dCoh + '. Your decisions — likely the visible hard ones — created allied questions about U.S. proportionality.');
+  if (dAttr >= 12) causes.push('Attribution confidence climbed +' + dAttr + ' — your investigative track produced a defensible public case.');
+  const causesHtml = causes.length
+    ? `<ul style="margin:6px 0 0 16px;padding:0;color:#cce0ff;font-size:11px;line-height:1.6">${causes.map(c => `<li style="margin-bottom:5px">${c}</li>`).join('')}</ul>`
+    : '<div style="color:#888;font-size:11px">No dominant pattern detected — your choices were balanced across lanes.</div>';
+
+  // ── Render AAR into a LEFT-SIDE panel so the user sees it without losing the map ──
+  let aarPanel = document.getElementById('aar-left-panel');
+  if (!aarPanel) {
+    aarPanel = document.createElement('div');
+    aarPanel.id = 'aar-left-panel';
+    document.body.appendChild(aarPanel);
+    // Big-clickable scrollbar styling for the AAR (16px wide, contrasting thumb)
+    if (!document.getElementById('aar-scrollbar-style')) {
+      const st = document.createElement('style');
+      st.id = 'aar-scrollbar-style';
+      st.textContent = `
+        #aar-left-panel ::-webkit-scrollbar { width: 16px; height: 16px; }
+        #aar-left-panel ::-webkit-scrollbar-track { background: rgba(0,255,136,0.06); border-left: 1px solid #00ff8833; }
+        #aar-left-panel ::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.45); border: 2px solid rgba(0,8,16,0.97); border-radius: 8px; }
+        #aar-left-panel ::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.7); }
+        #aar-left-panel { scrollbar-width: auto; scrollbar-color: rgba(0,255,136,0.5) rgba(0,255,136,0.06); }
+      `;
+      document.head.appendChild(st);
+    }
+  }
+  // Fills nearly the entire screen: stops at the right sidebar (340/540 wider) and bottom action bar.
+  // AAR is end-of-exercise so we expand it bigger than during play.
+  const sidebarW = document.body.classList.contains('exercise-active') ? 360 : 360;
+  aarPanel.style.cssText = `position:fixed;top:14px;left:14px;right:${sidebarW}px;bottom:124px;z-index:62;overflow:hidden;background:rgba(0,8,16,0.97);border:2px solid #00ff88;border-left:6px solid #00ff88;color:#cce0ff;font-family:Courier New,monospace;font-size:14px;line-height:1.7;box-shadow:0 6px 28px rgba(0,255,136,0.30);display:flex;flex-direction:column`;
+  aarPanel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,255,136,0.10);border-bottom:1px solid #00ff8844;flex-shrink:0">
+      <div style="color:#00ff88;font-size:11px;letter-spacing:2px;font-weight:bold">📋 AFTER-ACTION REVIEW</div>
+      <button id="aar-left-close" style="background:none;border:1px solid #00ff8866;color:#00ff88;padding:1px 8px;cursor:pointer;font-family:inherit;font-size:11px">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px">
+      <div style="border-left:4px solid ${verdictColor};padding:10px 14px;margin-bottom:12px;background:rgba(255,255,255,0.03)">
+        <div style="color:#888;font-size:9px;letter-spacing:2.5px;margin-bottom:4px">SIMULATED OUTCOME</div>
+        <div style="color:${verdictColor};font-size:15px;letter-spacing:2px;font-weight:bold;margin-bottom:6px">${verdict}</div>
+        <div style="color:#cce0ff;font-size:11px;line-height:1.65">${headline}</div>
+      </div>
+
+      <div style="color:${verdictColor};font-size:10px;letter-spacing:2px;margin-bottom:5px">▸ WHY THIS HAPPENED</div>
+      <div id="aar-grounded-narrative" style="margin-bottom:14px;padding:10px 14px;background:rgba(255,255,255,0.03);border-left:3px solid ${verdictColor};font-size:12px;line-height:1.65;color:#cce0ff">
+        <span style="color:#888;font-style:italic">⟳ AI is writing a grounded narrative from your specific decisions...</span>
+      </div>
+      <div style="color:${verdictColor};font-size:10px;letter-spacing:2px;margin-bottom:5px">▸ DECISION-PATTERN BREAKDOWN</div>
+      <div style="margin-bottom:14px">${causesHtml}</div>
+
+      <div style="color:#00ff88;font-size:10px;letter-spacing:2px;margin-bottom:6px">// DECISION TIMELINE //</div>
+      <div style="margin-bottom:14px">${timelineHtml}</div>
+
+      <div style="color:#00ff88;font-size:10px;letter-spacing:2px;margin-bottom:6px">// INDICATOR DELTAS //</div>
+      <div style="border:1px solid #00ff8833;padding:8px 12px;background:rgba(0,30,15,0.4);margin-bottom:12px">${indicatorHtml}</div>
+
+      <button id="aar-restart-btn" style="width:100%;padding:11px;background:rgba(0,255,136,0.10);color:#00ff88;border:1.5px solid #00ff88aa;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;font-weight:bold">▶ NEW EXERCISE</button>
+    </div>`;
+  document.getElementById('aar-left-close').addEventListener('click', () => { aarPanel.style.display = 'none'; });
+
+  // Fetch a GROUNDED AI narrative — temperature 0.4, strict prompt that references only
+  // the specific decisions Blue made + actual indicator deltas. Replaces hand-templated
+  // narrative that was too generic.
+  (async () => {
+    try {
+      const r = await fetch('http://localhost:8000/exercise/aar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario_title: ex.scenario.title,
+          scenario_summary: ex.scenario.summary || '',
+          decisions: ex.sitrep.map(s => ({ turn: s.turn, lane: s.lane, title: s.title, assessment: s.assessment })),
+          indicators_before: ind0,
+          indicators_after: indN,
+        }),
+      });
+      const d = await r.json();
+      const el = document.getElementById('aar-grounded-narrative');
+      if (!el) return;
+      if (d.ok && d.narrative) {
+        el.innerHTML = `<span>${d.narrative}</span><div style="margin-top:8px;font-size:9px;color:#666;letter-spacing:1.5px">SOURCE: llama3.1:8b · grounded on ${ex.sitrep.length} decisions + ${Object.keys(indN).length} indicators · temp 0.4</div>`;
+      } else {
+        el.innerHTML = `<span style="color:#888">AI narrative unavailable — see DECISION-PATTERN BREAKDOWN below.</span>`;
+      }
+    } catch (e) {
+      const el = document.getElementById('aar-grounded-narrative');
+      if (el) el.innerHTML = `<span style="color:#888">AI narrative endpoint offline — see DECISION-PATTERN BREAKDOWN below.</span>`;
+    }
+  })();
+
+  // Bottom overlay just gets a brief summary, not the full AAR
   const body = document.getElementById('exercise-overlay-body');
   body.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div>
-        <div style="color:#00ff88;font-size:10px;letter-spacing:2px;margin-bottom:6px">// DECISION TIMELINE //</div>
-        ${timelineHtml}
-      </div>
-      <div>
-        <div style="color:#00ff88;font-size:10px;letter-spacing:2px;margin-bottom:6px">// INDICATOR DELTAS //</div>
-        <div style="border:1px solid #00ff8833;padding:8px 12px;background:rgba(0,30,15,0.4)">${indicatorHtml}</div>
-        <button id="aar-restart-btn" style="margin-top:14px;width:100%;padding:10px;background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid #00ff8866;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px">▶ NEW EXERCISE</button>
-      </div>
+    <div style="text-align:center;padding:12px">
+      <div style="color:${verdictColor};font-size:14px;letter-spacing:2px;font-weight:bold;margin-bottom:6px">✓ EXERCISE COMPLETE — ${verdict}</div>
+      <div style="color:#a0b0c0;font-size:11px">Full After-Action Review on the left ←</div>
     </div>`;
 
   const restartBtn = document.getElementById('aar-restart-btn');
