@@ -24,6 +24,26 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def _prewarm_ollama():
+    """Pre-load llama3.1:8b into VRAM at backend startup so the first
+    judge-facing scenario generation doesn't pay the ~10s model-load cost.
+    Uses keep_alive=-1 so the model stays resident forever."""
+    import httpx as _hx
+    try:
+        async with _hx.AsyncClient(timeout=60.0) as c:
+            await c.post("http://localhost:11434/api/generate", json={
+                "model": "llama3.1:8b",
+                "prompt": "ok",
+                "stream": False,
+                "keep_alive": -1,
+                "options": {"num_predict": 1},
+            })
+        print("[PREWARM] llama3.1:8b loaded into VRAM with keep_alive=-1")
+    except Exception as e:
+        print(f"[PREWARM] skipped (Ollama not reachable yet): {e}")
+
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 class Position(BaseModel):
@@ -307,13 +327,15 @@ OLLAMA_MODEL_LOCAL = "llama3.1:8b"
 
 
 def _llm_json(system: str, user: str, temp: float = 0.85, num_predict: int = 1200, retries: int = 2):
-    """Call Ollama with JSON mode + retries until valid JSON returned."""
+    """Call Ollama with JSON mode + retries until valid JSON returned.
+    keep_alive=-1 locks the model in VRAM forever so judges never hit a cold-load."""
     last_err = None
     for attempt in range(retries + 1):
         try:
             with httpx.Client(timeout=180.0) as client:
                 r = client.post(f"{OLLAMA_URL_LOCAL}/api/chat", json={
                     "model": OLLAMA_MODEL_LOCAL, "stream": False,
+                    "keep_alive": -1,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},

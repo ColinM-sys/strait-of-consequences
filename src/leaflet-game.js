@@ -287,6 +287,8 @@ function _isLand(lat, lng) {
   if (lat < 21.50) return true;
   return false;
 }
+// Expose so ai-features.js can snap AI-generated OOB units off land.
+if (typeof window !== 'undefined') window._isLand = _isLand;
 
 function _hasLineOfSight(from, to) {
   const steps = 18;

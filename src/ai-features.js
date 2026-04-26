@@ -66,10 +66,14 @@
           } else if (typeof window.SCENARIOS === 'object') {
             window.SCENARIOS[s.id || ('ai-' + Date.now())] = s;
           }
-          // Re-render scenario cards if possible
-          if (typeof window.renderScenarios === 'function') window.renderScenarios();
+          // Re-render scenario cards on the right panel
+          if (typeof window.renderScenarioCards === 'function') {
+            window.renderScenarioCards();
+          } else if (typeof window.renderScenarios === 'function') {
+            window.renderScenarios();
+          }
           modal.style.display = 'none';
-          alert('Scenario injected. It now appears on the right-side EXERCISE tab.');
+          alert('Scenario injected. Open the EXERCISE tab on the right panel — the new AI-generated scenario is at the bottom of the list.');
         });
       } catch (e) {
         status.innerHTML = `<div style="color:#ff5566">✗ Network error: ${e.message}<br>Check that the backend is running on :8020 and Ollama is up.</div>`;
@@ -79,8 +83,72 @@
     });
   }
 
+  // ── Snap any AI-generated lat/lng off land. Spiral search for nearest water.
+  // Uses leaflet-game.js _isLand (covers Hormuz region precisely; permissive
+  // outside that region so Taiwan/Red Sea coords pass through).
+  function _snapToWater(lat, lng, type) {
+    if (typeof window._isLand !== 'function') return [lat, lng];
+    if (!window._isLand(lat, lng)) return [lat, lng];
+    // Land/coastal units that legitimately belong on land (airbases, missile sites, ports)
+    const landOk = ['airport', 'aerodrome', 'air_base', 'missile_battery', 'missile_site', 'airbase', 'sam_battery', 'radar', 'port'];
+    if (type && landOk.some(t => String(type).toLowerCase().includes(t))) return [lat, lng];
+    // Otherwise (ship/sub/FAC) — find nearest water by expanding spiral
+    for (let r = 0.05; r <= 0.6; r += 0.05) {
+      for (const [dy, dx] of [[0,r],[0,-r],[r,0],[-r,0],[r,r],[-r,-r],[r,-r],[-r,r]]) {
+        const nl = lat + dy, ng = lng + dx;
+        if (!window._isLand(nl, ng)) return [nl, ng];
+      }
+    }
+    return [lat, lng];
+  }
+
   // ── 2. AI Order-of-Battle Generator ───────────────────────────────────────
   let _oobMarkers = [];
+  let _oobModeActive = false;
+  let _oobHiddenLayers = []; // markers we hid when entering OOB mode (for restore)
+
+  function _enterOobMode(map, theater) {
+    if (_oobModeActive) return;
+    _oobModeActive = true;
+    _oobHiddenLayers = [];
+    // Iterate every layer currently on the map. If it's a marker / circleMarker /
+    // polyline / circle / polygon, hide it by removing — store a reference so
+    // _exitOobMode can re-add it.
+    map.eachLayer(layer => {
+      // Don't hide the base tile layer
+      if (layer instanceof L.TileLayer) return;
+      _oobHiddenLayers.push(layer);
+    });
+    _oobHiddenLayers.forEach(l => map.removeLayer(l));
+
+    // Drop a banner at top of viewport explaining the mode + exit button
+    let banner = document.getElementById('oob-mode-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'oob-mode-banner';
+      banner.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(8,16,28,0.95);border:2px solid #66ddff;border-left:6px solid #66ddff;padding:10px 18px;color:#66ddff;font-family:Courier New,monospace;font-size:12px;letter-spacing:2px;display:flex;gap:14px;align-items:center;box-shadow:0 4px 20px rgba(102,221,255,0.35)';
+      document.body.appendChild(banner);
+    }
+    banner.innerHTML = `
+      <span>🛰 OOB MODE · <span style="color:#fff">${theater}</span></span>
+      <button id="oob-mode-exit" style="background:rgba(255,85,102,0.15);border:1px solid #ff5566;color:#ff5566;padding:4px 12px;cursor:pointer;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px">✕ EXIT OOB MODE</button>`;
+    banner.style.display = 'flex';
+    document.getElementById('oob-mode-exit').addEventListener('click', () => _exitOobMode(map));
+  }
+
+  function _exitOobMode(map) {
+    if (!_oobModeActive) return;
+    _oobModeActive = false;
+    // Remove OOB markers
+    _oobMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+    _oobMarkers = [];
+    // Restore all the markers we hid
+    _oobHiddenLayers.forEach(l => { try { map.addLayer(l); } catch(e){} });
+    _oobHiddenLayers = [];
+    // Hide the banner
+    const banner = document.getElementById('oob-mode-banner');
+    if (banner) banner.style.display = 'none';
+  }
   function _wireOobGenerator() {
     const btn = document.getElementById('btn-ai-oob');
     const modal = document.getElementById('ai-oob-modal');
@@ -125,20 +193,42 @@
         if (renderBtn) renderBtn.addEventListener('click', () => {
           const map = window.game && window.game._map;
           if (!map) return;
-          // Clear prior OOB markers
-          _oobMarkers.forEach(m => map.removeLayer(m));
-          _oobMarkers = [];
+          // Enter OOB Mode — hide all existing map markers so the OOB shows clean
+          _enterOobMode(map, theater);
+          // Drop big, prominent markers — much more visible than the old subtle dots
           const drop = (item, color, prefix) => {
             if (typeof item.lat !== 'number' || typeof item.lng !== 'number') return;
-            const m = L.circleMarker([item.lat, item.lng], {
-              radius: 7, color, weight: 2, fillColor: color, fillOpacity: 0.4,
+            // Snap off land if the LLM put a ship/sub on land. Airbases &
+            // missile batteries stay where placed — they belong on land.
+            const [snapLat, snapLng] = _snapToWater(item.lat, item.lng, item.type);
+            const wasSnapped = (snapLat !== item.lat || snapLng !== item.lng);
+            const m = L.circleMarker([snapLat, snapLng], {
+              radius: 11, color, weight: 3, fillColor: color, fillOpacity: 0.6,
             }).addTo(map);
-            m.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;background:#fff;padding:8px;min-width:220px"><div style="color:${color};letter-spacing:2px;font-size:10px;font-weight:bold">${prefix} · ${item.type || ''}</div><div style="font-weight:bold;margin-top:3px">${item.unit || item.name || '(unnamed)'}</div><div style="margin-top:3px;color:#666">${item.capability || item.significance || ''}</div><div style="margin-top:6px;font-size:9px;color:#999">SOURCE: AI-generated OOB · Llama 3.1 8B</div></div>`);
+            const ring = L.circle([snapLat, snapLng], {
+              radius: 8000, color, weight: 1, fillOpacity: 0.05, opacity: 0.4, interactive: false,
+            }).addTo(map);
+            const snapNote = wasSnapped ? `<div style="margin-top:3px;color:#ffaa44;font-size:10px;font-style:italic">⚓ Position snapped to water (LLM coords were on land: ${item.lat?.toFixed(3)}°, ${item.lng?.toFixed(3)}°)</div>` : '';
+            m.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;background:#fff;padding:8px;min-width:240px"><div style="color:${color};letter-spacing:2px;font-size:10px;font-weight:bold">${prefix} · ${item.type || ''}</div><div style="font-weight:bold;margin-top:3px">${item.unit || item.name || '(unnamed)'}</div><div style="margin-top:3px;color:#666">${item.capability || item.significance || ''}</div><div style="margin-top:3px;color:#888;font-size:10px">${snapLat.toFixed(3)}°, ${snapLng.toFixed(3)}°</div>${snapNote}<div style="margin-top:6px;font-size:9px;color:#999">SOURCE: AI-generated OOB · Llama 3.1 8B</div></div>`);
             _oobMarkers.push(m);
+            _oobMarkers.push(ring);
           };
           (o.blue_force || []).forEach(u => drop(u, '#44aaff', 'BLUE'));
           (o.red_force || []).forEach(u => drop(u, '#ff5566', 'RED'));
           (o.key_terrain || []).forEach(t => drop(t, '#ffaa44', 'TERRAIN'));
+          // Auto-pan/zoom to fit the new OOB markers (especially important
+          // for Taiwan / Red Sea / other non-Hormuz theaters)
+          const allLatLngs = [
+            ...(o.blue_force || []),
+            ...(o.red_force || []),
+            ...(o.key_terrain || []),
+          ].filter(x => typeof x.lat === 'number' && typeof x.lng === 'number')
+           .map(x => [x.lat, x.lng]);
+          if (allLatLngs.length >= 2) {
+            try { map.fitBounds(L.latLngBounds(allLatLngs), { padding: [60, 60], maxZoom: 7 }); } catch (e) {}
+          } else if (allLatLngs.length === 1) {
+            try { map.setView(allLatLngs[0], 7); } catch (e) {}
+          }
           modal.style.display = 'none';
         });
       } catch (e) {

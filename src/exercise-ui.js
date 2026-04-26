@@ -671,22 +671,48 @@ function renderOverlay() {
 
   const body = document.getElementById('exercise-overlay-body');
   if (ex.sitrep.length === 0) {
-    // Scenario just started — show the brief + Turn 1 inject so the bottom
-    // overlay is informative instead of empty until first pick.
+    // Scenario just started — show brief + Turn 1 inject + 5 inline DIME+
+    // decision cards. User can pick directly from the bottom overlay; no
+    // need to scroll to the right side panel.
     const turn = ex.currentTurn();
+    const laneColors = { DIPLOMATIC:'#ffcc66', INFORMATION:'#cc66ff', MILITARY:'#ff6666', ECONOMIC:'#66ccff', INTELLIGENCE:'#66ff99' };
+    const laneIcons  = { DIPLOMATIC:'🤝', INFORMATION:'📻', MILITARY:'⚔', ECONOMIC:'💰', INTELLIGENCE:'🛰' };
+    const decisionsHtml = (turn?.decisions || []).map((d, idx) => {
+      const c = laneColors[d.lane] || '#cccccc';
+      const icon = laneIcons[d.lane] || '◇';
+      return `
+        <div class="overlay-dec-card" data-dec-idx="${idx}" style="border:1px solid ${c}55;border-left:3px solid ${c};background:rgba(255,255,255,0.02);padding:8px 12px;cursor:pointer;transition:background 0.15s;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="flex:1">
+              <div style="color:${c};font-size:9px;letter-spacing:2px;font-weight:bold">${icon} ${d.lane}</div>
+              <div style="color:#fff;font-size:12px;margin-top:3px;font-weight:bold">${d.title}</div>
+              <div style="color:#a0b0c0;font-size:10px;margin-top:4px;line-height:1.4">${d.assessment ? d.assessment.slice(0, 200) + (d.assessment.length > 200 ? '...' : '') : ''}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
     body.innerHTML = `
       <div style="border-left:3px solid #ff8800;padding:8px 14px;margin-bottom:8px;background:rgba(255,136,0,0.06)">
         <div style="color:#ff8800;font-size:10px;letter-spacing:2px;margin-bottom:4px">SCENARIO BRIEF</div>
         <div style="color:#fff;font-size:13px;font-weight:bold;margin-bottom:4px">${ex.scenario.title}</div>
         <div style="color:#cce0ff;font-size:11px;line-height:1.5">${ex.scenario.summary || ''}</div>
       </div>
-      <div style="border-left:3px solid #44cc88;padding:8px 14px;margin-bottom:8px;background:rgba(68,204,136,0.06)">
+      <div style="border-left:3px solid #44cc88;padding:8px 14px;margin-bottom:10px;background:rgba(68,204,136,0.06)">
         <div style="color:#44cc88;font-size:10px;letter-spacing:2px;margin-bottom:4px">TURN 1 INJECT</div>
         <div style="color:#cce0ff;font-size:11px;line-height:1.5">${turn ? turn.inject : ''}</div>
       </div>
-      <div style="color:#7a8896;font-size:10px;letter-spacing:1.5px;text-align:center;padding:6px 0">
-        ▶ PICK A DIME+ DECISION FROM THE SIDE PANEL ◀
-      </div>`;
+      <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:6px 0 6px 0">═════ CHOOSE A DIME+ DECISION ═════</div>
+      ${decisionsHtml}`;
+    // Wire each card to onDecisionPicked
+    body.querySelectorAll('.overlay-dec-card').forEach(card => {
+      card.addEventListener('mouseenter', () => { card.style.background = 'rgba(255,255,255,0.06)'; });
+      card.addEventListener('mouseleave', () => { card.style.background = 'rgba(255,255,255,0.02)'; });
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.decIdx, 10);
+        const dec = (ex.currentTurn()?.decisions || [])[idx];
+        if (dec) onDecisionPicked(dec);
+      });
+    });
     return;
   }
   body.innerHTML = ex.sitrep.map(s => `
