@@ -529,6 +529,11 @@ export class LeafletGame {
         destroyed: false,
         heading: def.side === 'blue' ? 212 : 0,
         _heading: def.side === 'blue' ? 212 : 0,
+        _origLat: def.lat,
+        _origLng: def.lng,
+        _origType: def.type,
+        _origSide: def.side,
+        _origHeading: def.side === 'blue' ? 212 : 0,
       };
 
       const marker = L.marker([def.lat, def.lng], {
@@ -2094,7 +2099,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
     if (ddgR.marker)                ddgR.marker.setIcon(makeIcon(ddgR.type,    'blue', false, headingDeg));
     if (cruiser && cruiser.marker)  cruiser.marker.setIcon(makeIcon(cruiser.type,'blue', false, headingDeg));
     if (carrier && carrier.marker)  carrier.marker.setIcon(makeIcon(carrier.type,'blue', false, headingDeg));
-    const STEPS = 10;
+    const STEPS = 30;
     for (let s = 1; s <= STEPS; s++) {
       const t = s / STEPS;
       const lat = from[0] + dLat * t;

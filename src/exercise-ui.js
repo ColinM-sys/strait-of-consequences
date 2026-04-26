@@ -191,13 +191,18 @@ function syncLegacyStateStrip() {
   const ins  = document.getElementById('econ-insurance');
   const clos = document.getElementById('econ-closure');
 
+  // % of world oil supply held up by strait disruption, indexed by escalation rung.
+  // Strait of Hormuz baseline through-flow ≈ 21% of global oil + 28% of LNG.
+  // ATRISK_BY_RUNG = how much of that flow is held up at each rung.
+  const ATRISK_BY_RUNG = [0, 3, 7, 12, 18, 21]; // HARASS → WAR
+  const BPD_BY_RUNG    = [0.0, 0.6, 1.3, 2.2, 3.4, 3.9]; // M BPD held up
   if (!activeExercise) {
-    // Idle defaults
+    // Idle defaults — strait open, baseline ~$84 Brent, no strait disruption
     ladder.forEach(r => r.classList.remove('current'));
     if (ladder[0]) ladder[0].classList.add('current');
-    if (oil)  oil.textContent  = '—';
-    if (bpd)  bpd.textContent  = '18.5M BPD';
-    if (ins)  ins.textContent  = '—';
+    if (oil)  oil.textContent  = '0% world supply';
+    if (bpd)  bpd.textContent  = '$92 Brent · 0M BPD held up';
+    if (ins)  ins.textContent  = '120 bps';
     if (clos) clos.textContent = 'OPEN';
     return;
   }
@@ -206,8 +211,11 @@ function syncLegacyStateStrip() {
   ladder.forEach((r, idx) => {
     r.classList.toggle('current', idx === rung);
   });
-  if (oil)  oil.textContent  = '$' + ind.oilPrice + '/bbl';
-  if (bpd)  bpd.textContent  = (ind.iranCoercion || 0) + '% IRAN COERCION';
+  // OIL AT RISK card: % of world supply held up by strait disruption
+  const atRiskPct = ATRISK_BY_RUNG[rung] ?? 0;
+  const bpdHeld   = BPD_BY_RUNG[rung] ?? 0;
+  if (oil)  oil.textContent  = atRiskPct + '% world supply';
+  if (bpd)  bpd.textContent  = '$' + ind.oilPrice + ' Brent · ' + bpdHeld.toFixed(1) + 'M BPD held up';
   if (ins)  ins.textContent  = ind.warRiskInsurance + ' bps';
   // Map rung → strait closure status
   const closure = rung >= 4 ? 'CLOSED' : rung >= 2 ? 'CONTESTED' : 'OPEN';

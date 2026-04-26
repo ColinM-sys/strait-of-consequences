@@ -71,9 +71,35 @@ Format follows the canonical professional wargame pattern (RAND / CSIS / NWC New
 - **Sentinel-2 Imagery** — Pull real ESA satellite passes (last 10 days) for any area. Compare before/after imagery with a drag slider. AI analysis detects ship presence and military buildup.
 - **Airport Intel Overlay** — AI-analyzed aircraft counts at 66 airports across Iran, Iraq, UAE, Saudi Arabia, Pakistan.
 
-### Markets Panel
-- Real-time indicator dashboard: Brent / WTI prices, war-risk insurance basis points, strait-closure probability, alliance cohesion meter.
-- Updates from exercise indicator deltas turn-by-turn.
+### Routes Tab (replaces Markets)
+- 🚦 ROUTES tab — 5 preset transit options for the Blue strike group. Each card shows the IRGC engagement profile as colored tags (FAC engagement range, missile chance, swarm spawn, rear intercept, mine hit chance).
+- Click ▶ EXECUTE on any card → paints the route polyline, animates the 5-ship formation along it, applies the route's IRGC profile deltas to active exercise indicators (escalation rung / war-risk / oil), and runs proximity alerts + DDG mine-sweep + FAC engagement against everything on the path.
+- **TSS LANE** (cyan) — standard commercial route, low IRGC engagement
+- **NORTHERN PUSH** (red) — aggressive route close to Iranian coast; FAC swarm probable; +45 bps insurance, +1 rung
+- **OMANI HUG** (green) — stays in Omani territorial water; no IRGC engagement; longer transit; insurance unaffected
+- **HIGH-SPEED RUN** (amber) — 2× speed, reduced ISR, mines harder to sweep, 35 % mine-hit probability
+- **NIGHT TRANSIT** (purple) — reduced IRGC ISR; rear intercept possible; attribution confidence drops 3
+
+### Live State Strip (always visible above scenarios)
+- **Escalation Ladder** (HARASS → SEIZURE → MINING → STRIKE → CLOSURE → WAR) — current rung flashes orange and updates live every decision pick
+- **Econ bar** — OIL PRICE, WAR-RISK INSURANCE (bps), IRAN CLOSURE (OPEN / CONTESTED / CLOSED, derived from rung)
+- **Coalition flag bar** — 🇬🇧 🇫🇷 🇸🇦 🇺🇳 🇨🇳. Click any flag → popover with that country's per-scenario position and "WITH BLUE" / "NOT WITH BLUE" badge. UK / France / Saudi auto-flip hostile if alliance cohesion drops below 50.
+- Whole strip flashes amber on every decision pick — visible feedback that the system processed your input even if values didn't change
+
+### Combat & Engagement (during transit)
+- **Destroyer mine sweep** — any DDG within 5 km of a live mine pops it (cyan banner, mine + kill-radius ring removed)
+- **Destroyer FAC engagement** — any DDG within 15 km of an IRGC FAC kills it (orange banner + ⊗ wreck icon, FAC marker removed)
+- **Historical-incident proximity alerts** — formation passing within 90 km of any of the 6 historical mining/attack points triggers a banner + pulses the marker + bumps war-risk insurance
+- **Map-event indicator deltas** — every animation type (STRIKE / MINED / OIL_SLICK / BOARDED / DISABLED / SINKING / CONVOY_FORM / TRANSIT_HALT) auto-bumps escalation rung + econ indicators when the exercise is active
+
+### Diamond Escort Formation
+All 5 Blue surface units transit together with proper standoff spacing (no overlap):
+- **Tanker (lead)** — MV PACIFIC LION, on the painted route line
+- **DDG-102 SAMPSON** — port forward escort, ~44 km lateral, ~22 km astern
+- **DDG-119 D.BLACK** — starboard forward escort, ~44 km lateral, ~22 km astern
+- **CG-62 CHANCELLORS** — cruiser, ~28 km starboard, ~50 km astern
+- **CVN-76 REAGAN** — carrier, deep aft center, ~78 km astern (typical CSG standoff)
+- Headings auto-rotate per segment so all 5 ships point bow-forward through every turn
 
 ---
 
@@ -165,12 +191,16 @@ This tool is built to that canonical pattern, locally hosted, fully air-gapped, 
 - ✅ Ship expand-arrow → side panel with per-stakeholder impact bars + actor-category taxonomy
 - ✅ Hand-authored branching (Turn 1 MILITARY → escalation; Turn 1 DIPLOMATIC → de-escalation; 8 branch turns × 5 decisions = 40 alternates)
 - ✅ Live map visualization on every pick (entity pulse + auto-zoom + dim isolation)
-- ✅ Per-vessel impact animations (8 named effect types)
+- ✅ Per-vessel impact animations (8 named effect types) with auto-bump of exercise indicators
 - ✅ Key-vessel isolation (dim non-relevant ships when scenario active, pulsing highlight on key actors)
-- ✅ Historical mine + attack marker overlay (6 real geocoded incidents)
-- ✅ Painted-route tanker transit simulation (escort formation auto-rotates heading + proximity alerts on historical mines)
-- ✅ MINING scenario mine-field markers
-- ✅ AI adjudicator endpoint (built; disabled by default for demo speed; re-enable via console flag when faster GPU is reachable)
+- ✅ Historical mine + attack marker overlay (6 real geocoded incidents) — toggle on demand
+- ✅ Painted-route tanker transit simulation — full 5-ship escort formation, heading auto-rotation, proximity alerts on historical mines, DDG mine-sweep + FAC engagement
+- ✅ MINING scenario mine-field markers (drop on scenario start, cleared on end)
+- ✅ AI adjudicator endpoint (built; disabled by default for demo speed; re-enable via `window.AI_ADJUDICATE = true`)
+- ✅ ROUTES tab — 5 preset transit profiles with IRGC engagement variants, replaces MARKETS
+- ✅ Always-visible state strip — escalation ladder + econ bar + coalition flags above scenario picker, flashes on every pick
+- ✅ Coalition flags clickable with per-scenario popovers, auto-hostile when alliance cohesion < 50
+- ✅ Click-on-water deselects controlled units (was sticky before)
 - 🟡 OSM infrastructure layer — in progress
 - 🟡 ACLED feed integration — in progress
 - 🟡 JCS / CSIS doctrinal RAG ingestion — in progress

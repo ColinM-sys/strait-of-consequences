@@ -1155,6 +1155,41 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
     hideShipsBtn.style.background = _shipsHidden ? 'rgba(170,102,255,0.18)' : 'transparent';
     hideShipsBtn.querySelector('.btn-label').innerHTML = _shipsHidden ? 'SHOW ALL<br>SHIPS' : 'HIDE ALL<br>SHIPS';
   });
+
+  // RESET button — wipes exercise state + restores ships to start positions + clears overlays
+  const resetBtn = document.getElementById('btn-reset-all');
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    // 1. End any active exercise (clears mines, restores dim, etc.)
+    if (typeof window.endExercise === 'function') window.endExercise();
+    // 2. Restore game units to their UNIT_DEFS starting positions + heading
+    if (window.game && window.game._units) {
+      window.game._units.forEach(u => {
+        if (u.marker && u._origLat !== undefined) {
+          u.marker.setLatLng([u._origLat, u._origLng]);
+        } else if (u.marker && typeof u.lat === 'number') {
+          // First reset — stash originals, then restore lat/lng from UNIT_DEFS
+          u._origLat = u.lat; u._origLng = u.lng;
+        }
+        u.destroyed = false;
+      });
+    }
+    // 3. Clear painted route overlay if any
+    try { if (window._lastRouteOverlay && window.game && window.game.map) window.game.map.removeLayer(window._lastRouteOverlay); } catch (e) {}
+    window._lastRouteOverlay = null;
+    // 4. Clear historical-incident markers
+    if (typeof window.hideHistoricalIncidents === 'function') window.hideHistoricalIncidents();
+    // 5. Clear active-mine registry
+    if (window._activeMines) window._activeMines.length = 0;
+    // 6. Re-sync the legacy state strip back to idle
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+    // 7. Show feedback banner
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#ffcc44;padding:8px 18px;border:1px solid #ffcc4488;border-left:4px solid #ffcc44;z-index:9000;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+    banner.innerHTML = '🔄 RESET — exercise ended, ships at origin, overlays cleared';
+    document.body.appendChild(banner);
+    setTimeout(() => banner.style.opacity = '0', 2200);
+    setTimeout(() => banner.remove(), 2900);
+  });
 }
 
 async function _runIntelAnalysis(sw, ne) {
@@ -2501,7 +2536,7 @@ const CHAT_LLM  = 'http://localhost:11434/api/generate';
 const CHAT_MODEL = 'llama3.1:8b';
 
 function _showTab(name) {
-  ['exercise','chat','markets'].forEach(t => {
+  ['exercise','chat','routes'].forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.remove('active');
     if (t === 'exercise') document.getElementById('panel-exercise').style.display = 'none';
     else document.getElementById(`panel-${t}`)?.classList.remove('visible');
@@ -2513,7 +2548,7 @@ function _showTab(name) {
 }
 document.getElementById('tab-exercise').addEventListener('click', () => _showTab('exercise'));
 document.getElementById('tab-chat').addEventListener('click',    () => _showTab('chat'));
-document.getElementById('tab-markets').addEventListener('click', () => _showTab('markets'));
+document.getElementById('tab-routes').addEventListener('click', () => _showTab('routes'));
 _showTab('exercise');
 
 async function _chatSend() {
@@ -2596,6 +2631,7 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 // Exercise UI init
 if (typeof renderScenarioCards === 'function') {
   renderScenarioCards();
+  if (typeof renderRouteCards === 'function') renderRouteCards();
   if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
   const endBtn = document.getElementById('exercise-end-btn');
   if (endBtn) endBtn.addEventListener('click', endExercise);

@@ -110,8 +110,8 @@
     #panel-exercise { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
     #panel-chat { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; padding: 0; }
     #panel-chat.visible { display: flex; }
-    #panel-markets { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
-    #panel-markets.visible { display: flex; }
+    #panel-routes { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
+    #panel-routes.visible { display: flex; }
     .mkt-header { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-bottom: 2px; }
     .mkt-price { font-size: 28px; letter-spacing: 2px; color: #ffdd55; font-weight: bold; }
     .mkt-sub { font-size: 11px; color: var(--dim); margin-top: 2px; }
@@ -786,6 +786,7 @@
   <button class="action-btn cyan"   id="btn-sim-transit"><span class="btn-icon">⏃</span><span class="btn-label">SIMULATE<br>BLUE TRANSIT</span><span class="btn-cost">DDG west-bound</span></button>
   <button class="action-btn green"  id="btn-exec-route"><span class="btn-icon">▶</span><span class="btn-label">EXECUTE<br>PAINTED ROUTE</span><span class="btn-cost">tanker + 2 escorts</span></button>
   <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
+  <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
   <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
   <div id="dpad">
     <div id="dpad-row">
@@ -812,7 +813,7 @@
   <div id="panel-tabs">
     <button class="panel-tab active" id="tab-exercise">⚠ EXERCISE</button>
     <button class="panel-tab" id="tab-chat">💬 INTEL CHAT</button>
-    <button class="panel-tab" id="tab-markets">📈 MARKETS</button>
+    <button class="panel-tab" id="tab-routes">🚦 ROUTES</button>
   </div>
   <div id="panel-exercise">
   <!-- Hidden legacy wargame DOM — kept so existing JS handlers don't crash on null. Will be removed once those references are stripped. -->
@@ -861,8 +862,14 @@
     </div>
   </div>
   </div><!-- end #panel-exercise -->
-  <div id="panel-markets">
+  <div id="panel-routes">
     <div id="exercise-indicators-strip" style="display:none;border:1px solid #ff660066;padding:10px 12px;background:rgba(255,80,0,0.05);margin-bottom:10px"></div>
+    <div style="color:#88ccff;font-size:11px;letter-spacing:2px;margin-bottom:10px;padding:0 4px">// TRANSIT ROUTE OPTIONS //</div>
+    <div id="route-cards"></div>
+    <div style="color:#7a8896;font-size:10px;line-height:1.5;margin-top:14px;padding:8px 10px;border-top:1px dashed #1a3a5a">
+      Each route is a preset transit + IRGC engagement profile. Click EXECUTE on any card to paint the path and run the formation along it.
+    </div>
+    <details style="margin-top:14px;color:#7a8896;font-size:10px"><summary style="cursor:pointer;letter-spacing:2px;padding:4px 0">▸ LEGACY MARKET DATA</summary><div id="legacy-markets-content">
     <div class="strait-status-bar">
       <div class="strait-status-label">STRAIT OF HORMUZ — CURRENT STATUS</div>
       <div class="strait-status-val">⛔ EFFECTIVELY CLOSED — DUAL NAVAL BLOCKADE ACTIVE</div>
@@ -929,7 +936,8 @@
         </div>
       </div>
     </div>
-  </div><!-- end #panel-markets -->
+    </div></details>
+  </div><!-- end #panel-routes -->
   <div id="panel-chat">
     <div id="chat-messages">
       <div class="chat-msg chat-msg-ai">
@@ -973,12 +981,14 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=131"></script>
-<script src="src/ship-taxonomy.js?v=131"></script>
-<script src="src/scenarios.js?v=131"></script>
-<script src="src/exercise.js?v=131"></script>
-<script src="src/exercise-ui.js?v=131"></script>
-<script type="module" src="src/main.js?v=131"></script>
+<script src="src/historical-incidents.js?v=134"></script>
+<script src="src/ship-taxonomy.js?v=134"></script>
+<script src="src/scenarios.js?v=134"></script>
+<script src="src/routes.js?v=134"></script>
+<script src="src/exercise.js?v=134"></script>
+<script src="src/exercise-ui.js?v=134"></script>
+<script src="src/routes-ui.js?v=134"></script>
+<script type="module" src="src/main.js?v=134"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>
