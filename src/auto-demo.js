@@ -144,13 +144,36 @@
       }
       await _wait(10000);
 
-      // ── STEP 7 — Sentinel-2 satellite imagery ─────────────────
-      _say('STEP 7 / 11 · SENTINEL-2 SATELLITE IMAGERY',
-        'SENTINEL — pulls real ESA Sentinel-2 imagery for any bbox over the last 10 days. ' +
-        'Drag-slider before-and-after comparison with VLM diff analysis. Time-machine intelligence: ' +
-        'ship presence shifts, military buildup, infrastructure changes.',
+      // ── STEP 7 — Sentinel-2 satellite imagery (Kish Island airport) ──
+      _say('STEP 7 / 11 · SENTINEL-2 — KISH ISLAND AIRPORT',
+        'Zooming the map to Kish Island International — Iranian civilian airport, IRGC-controlled. ' +
+        'Drawing the AOI box and pulling real ESA Sentinel-2 passes for the last 10 days.',
         58);
-      // Highlight the SENTINEL button
+      const KISH_LAT = 26.526, KISH_LNG = 53.98;
+      const map = window.game && window.game._map;
+      let kishBox = null;
+      if (map) {
+        // Pan + zoom to Kish
+        map.setView([KISH_LAT, KISH_LNG], 12, { animate: true });
+        await _wait(2500);
+        // Draw a visible AOI rectangle showing the Sentinel bbox (glowing cyan)
+        const PAD = 0.05; // ~5.5km box
+        kishBox = L.rectangle(
+          [[KISH_LAT - PAD, KISH_LNG - PAD], [KISH_LAT + PAD, KISH_LNG + PAD]],
+          { color: '#33aaff', weight: 3, fillColor: '#33aaff', fillOpacity: 0.08, dashArray: '6 4' }
+        ).addTo(map);
+        // Pulsing label on the box
+        const aoiLabel = L.marker([KISH_LAT + PAD + 0.01, KISH_LNG], {
+          icon: L.divIcon({
+            html: `<div style="background:rgba(8,16,28,0.95);border:1px solid #33aaff;color:#33aaff;font-family:Courier New,monospace;font-size:10px;padding:3px 8px;letter-spacing:1.5px;white-space:nowrap;box-shadow:0 0 8px #33aaff">📡 SENTINEL AOI · KISH AIRPORT</div>`,
+            className: '', iconAnchor: [-40, 0],
+          }),
+          interactive: false,
+        }).addTo(map);
+        kishBox._label = aoiLabel;
+        await _wait(2000);
+      }
+      // Highlight the SENTINEL button briefly
       const sentinelBtn = $('sentinel-btn');
       if (sentinelBtn) {
         const orig = sentinelBtn.style.boxShadow;
@@ -159,14 +182,28 @@
         setTimeout(() => { sentinelBtn.style.boxShadow = orig; }, 5000);
       }
       click('#sentinel-btn');
-      await _wait(12000);
-      // Close Sentinel modal if open
-      const sentinelOverlay = $('sentinel-overlay');
-      if (sentinelOverlay && sentinelOverlay.style.display === 'flex') sentinelOverlay.style.display = 'none';
-      const sentinelClose = document.querySelector('#sentinel-close, .sentinel-close, [aria-label="close sentinel"]');
-      if (sentinelClose) sentinelClose.click();
-      // Try ESC keyboard event as fallback
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      // Wait for thumbnails to populate (real ESA fetch takes 5-15s)
+      for (let i = 0; i < 50; i++) {
+        if (_demoAborted) break;
+        const strip = document.getElementById('sentinel-filmstrip');
+        if (strip && strip.children.length >= 2) break;
+        await sleep(500);
+      }
+      await _wait(2000);
+
+      _say('STEP 7 / 11 · SENTINEL-2 COMPARE MODE',
+        'Switching to COMPARE mode — drag-slider before/after split-screen. Operator picks two dates ' +
+        'from the filmstrip; VLM analyzes the diff for ship presence shifts, infrastructure changes.',
+        62);
+      click('#sentinel-btn-compare');
+      await _wait(8000);
+
+      // Close panel + remove the AOI box
+      click('#sentinel-panel-close');
+      if (kishBox && map) {
+        try { map.removeLayer(kishBox); } catch (e) {}
+        try { if (kishBox._label) map.removeLayer(kishBox._label); } catch (e) {}
+      }
       await _wait(1500);
 
       // ── STEP 8 — AI Scenario Generator ─────────────────────────
