@@ -393,9 +393,9 @@ export class LeafletGame {
 
     const setMode = (mode) => {
       this._paintMode = this._paintMode === mode ? null : mode;
-      btnPath.classList.toggle('active',     this._paintMode === 'path');
-      btnBoundary.classList.toggle('active', this._paintMode === 'boundary');
-      btnBattery.classList.toggle('active',  this._paintMode === 'battery');
+      if (btnPath)     btnPath.classList.toggle('active',     this._paintMode === 'path');
+      if (btnBoundary) btnBoundary.classList.toggle('active', this._paintMode === 'boundary');
+      if (btnBattery)  btnBattery.classList.toggle('active',  this._paintMode === 'battery');
       if (this._paintMode) {
         this._map.dragging.disable();
         mapEl.style.cursor = 'crosshair';
@@ -405,19 +405,19 @@ export class LeafletGame {
       }
     };
 
-    btnPath.addEventListener('click',     () => setMode('path'));
-    btnBoundary.addEventListener('click', () => setMode('boundary'));
-    btnBattery.addEventListener('click',  () => setMode('battery'));
+    if (btnPath)     btnPath.addEventListener('click',     () => setMode('path'));
+    if (btnBoundary) btnBoundary.addEventListener('click', () => setMode('boundary'));
+    if (btnBattery)  btnBattery.addEventListener('click',  () => setMode('battery'));
 
-    btnClear.addEventListener('click', () => {
+    if (btnClear) btnClear.addEventListener('click', () => {
       this._paintLines.forEach(l => this._map.removeLayer(l));
       this._paintLines = [];
       this._activeLine = null;
       this._paintPoints = [];
       this._batteryPins.forEach(m => this._map.removeLayer(m));
       this._batteryPins = [];
-      coordEl.style.display = 'none';
-      btnClear.style.display = 'none';
+      if (coordEl)  coordEl.style.display = 'none';
+      if (btnClear) btnClear.style.display = 'none';
     });
 
     coordEl.addEventListener('click', () => {
