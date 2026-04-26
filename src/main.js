@@ -1476,6 +1476,26 @@ async function _runSurvey(sw, ne) {
   const lngSpan = ne.lng - sw.lng;
   const centerLat = (sw.lat + ne.lat) / 2;
   const centerLng = (sw.lng + ne.lng) / 2;
+  // Guard: ArcGIS rejects tiles below ~500m on a side (sub-tile would be < 167m).
+  // 0.003° lat ~= 333m so use that as minimum total span — gives ~110m sub-tiles.
+  if (latSpan < 0.003 || lngSpan < 0.003) {
+    const widthM  = (lngSpan * 111 * Math.cos(centerLat * Math.PI/180)).toFixed(0);
+    const heightM = (latSpan * 111).toFixed(0);
+    if (body) body.innerHTML = `
+      <div style="color:#ff8844;font-size:13px;padding:14px;border-left:3px solid #ff8844;background:rgba(255,136,68,0.06)">
+        <div style="font-weight:bold;margin-bottom:6px">⚠ AREA TOO SMALL FOR SURVEY</div>
+        <div style="color:#cce0ff;line-height:1.6">Box was ~${heightM}m × ${widthM}m. ArcGIS's World Imagery rejects sub-tile requests below ~500m.</div>
+        <div style="margin-top:10px;color:#cce0ff;line-height:1.7">
+          <b>Two ways to fix:</b><br>
+          1. <b>Zoom out</b> on the map first (mouse wheel or zoom buttons) until your view covers a wider area, then re-click 🗺 SURVEY and draw a box.<br>
+          2. <b>Click-and-drag a real rectangle</b> across at least ~5km on the map. Don't just click — hold mouse button and drag for ~2-3 cm of mouse movement.
+        </div>
+        <div style="margin-top:10px;color:#88aacc;line-height:1.6">For zoomed-in single-spot analysis, use <b>🔭 INTEL</b> instead — it captures the current view as one tile.</div>
+      </div>`;
+    btn.classList.remove('loading');
+    btn.textContent = '🗺 SURVEY (3×3 GRID)';
+    return;
+  }
   if (coordsEl) coordsEl.textContent = `SURVEY ${centerLat.toFixed(3)}°N ${centerLng.toFixed(3)}°E  ${GRID}×${GRID}`;
 
   const tiles = [];
@@ -1689,9 +1709,11 @@ async function _runSurvey(sw, ne) {
         if (sacN > 0 || svcN > 0) subLines.push(`  R${sr}C${sc}: ${sacN > 0 ? sacN+' ac' : ''}${svcN > 0 ? ' '+svcN+' vs' : ''}`);
       }
 
-      // Calibrate down for tile-boundary double-counting in 3x3 sub-grid (empirical ~0.55x)
-      // Without this, multi-tile aircraft get counted in 2-4 adjacent sub-tiles.
-      const SURVEY_DEDUPE = 0.55;
+      // Calibrate down for both tile-boundary double-counting AND VLM systematic overcount
+      // (model picks up jet bridges, ground vehicles, hangar shadows as aircraft).
+      // Empirical ground-truth check on Kish Island: 6 real / 64 raw → 0.094.
+      // Using 0.18 as a safer factor that lands close-but-conservative across airbases.
+      const SURVEY_DEDUPE = 0.18;
       const dedupAc = Math.round(poiTotalAc * SURVEY_DEDUPE);
       const dedupVc = Math.round(poiTotalVc * SURVEY_DEDUPE);
       totalAircraft += dedupAc;

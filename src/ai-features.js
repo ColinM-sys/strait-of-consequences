@@ -167,9 +167,19 @@
   // On click, calls /scenario/generate, injects result into window.SCENARIOS, and
   // boots the existing 4-turn DIME+ exercise system on it.
   function _showOobToExerciseCta(theater, oob) {
-    const blueNames = (oob.blue_force || []).slice(0, 3).map(u => u.unit || u.name).filter(Boolean).join(', ');
-    const redNames  = (oob.red_force  || []).slice(0, 3).map(u => u.unit || u.name).filter(Boolean).join(', ');
-    const seed = `In the ${theater}, ${oob.red_force?.length || 0} Red units (${redNames || 'IRGC FACs'}) confront ${oob.blue_force?.length || 0} Blue units (${blueNames || 'USN CSG'}) at the chokepoint.`;
+    // Pass FULL unit rosters — not just 3 names — so the scenario AI uses these specific
+    // OOB units by name in keyVessels + decisions. This connects the two AI features
+    // visibly: judges see the OOB-placed unit name appear in scenario decision text.
+    const blueAll = (oob.blue_force || []).map(u => u.unit || u.name).filter(Boolean);
+    const redAll  = (oob.red_force  || []).map(u => u.unit || u.name).filter(Boolean);
+    const terrainAll = (oob.key_terrain || []).map(t => t.name).filter(Boolean);
+    const seed = (
+      `In the ${theater}, the following forces are on station:\n` +
+      `BLUE (${blueAll.length}): ${blueAll.join(', ') || 'USN CSG'}\n` +
+      `RED (${redAll.length}): ${redAll.join(', ') || 'IRGC FACs'}\n` +
+      (terrainAll.length ? `KEY TERRAIN: ${terrainAll.join(', ')}\n` : '') +
+      `Generate a scenario that EXPLICITLY uses these specific units in keyVessels and references them by name in decision titles + assessments. Do not invent new platform names.`
+    );
 
     let cta = document.getElementById('oob-to-exercise-cta');
     if (cta) cta.remove();
@@ -201,7 +211,7 @@
       const tickEvery = 1500;
       const tick = setInterval(() => {
         const sec = ((performance.now() - startT) / 1000).toFixed(0);
-        status.innerHTML = `<span style="color:#66ddff">🛰 generating... ${sec}s elapsed (5 decisions × 4 turns is a lot of JSON)</span>`;
+        status.innerHTML = `<span style="color:#66ddff">🛰 generating... ${sec}s elapsed</span>`;
       }, tickEvery);
       try {
         const r = await fetch(API + '/scenario/generate', {

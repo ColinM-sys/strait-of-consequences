@@ -3,9 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import ai_agents
+import asyncio as _asyncio_mod
 import chromadb
+import httpx
 import uuid
 from datetime import datetime
+
+_asyncio_gather = _asyncio_mod.gather
 
 # ── ChromaDB intel memory ─────────────────────────────────────────────────────
 _chroma = chromadb.PersistentClient(path="./intel_db")
@@ -410,13 +414,107 @@ async def post_scenario_generate(req: ScenarioGenRequest):
         "Each turn has 3 decisions (DIPLOMATIC, MILITARY, ECONOMIC). "
         "REMINDER: turns array length must be exactly 4. Do not stop after T1."
     )
-    # 2400 tokens to fit 4 full turns. Was 1700 — caused truncation to 1 turn.
-    parsed, raw = _llm_json(SCENARIO_GEN_SYSTEM, user_prompt, temp=0.7, num_predict=2400)
+    # Temp 0.3 (was 0.7) — model picks more probable (shorter) phrasings, lower variance.
+    # num_predict 2000 caps the worst-case output, ensures 4 turns still fit but kills
+    # the verbose long-tail samples that were producing 50s+ runs. Targets ~30s warm.
+    parsed, raw = _llm_json(SCENARIO_GEN_SYSTEM, user_prompt, temp=0.3, num_predict=2000)
     if not parsed:
         return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:500]}
     if "turns" not in parsed or len(parsed.get("turns", [])) != 4:
         return {"ok": False, "error": "wrong_turn_count", "got": len(parsed.get("turns", []))}
     return {"ok": True, "scenario": parsed}
+
+
+# ── PARALLEL scenario generator: header + 4 turns in concurrent Ollama calls ──
+HEADER_SYSTEM = """You are a wargame scenario designer. Generate ONLY the scenario header (no turns).
+Output valid JSON of this shape:
+{"id":"kebab","title":"CAPS","rung":"HARASS|SEIZURE|MINING|STRIKE|CLOSURE","rungColor":"#hex","threat":"...","summary":"one paragraph","keyVessels":["..."],"initialIndicators":{"escalationRung":2,"oilPrice":110,"warRiskInsurance":900,"allianceCohesion":60,"attributionConfidence":60,"iranCoercion":50}}
+Real names only: Bandar Abbas, Larak, Fujairah, Ras Tanura, USN CSG, IRGC, Lloyd's JWC, Aramco. Output ONLY JSON."""
+
+TURN_SYSTEM = """You are a wargame designer generating ONE turn of a Hormuz exercise.
+Output valid JSON of this shape:
+{"inject":"one-sentence sitrep update","decisions":[
+  {"lane":"DIPLOMATIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},
+  {"lane":"MILITARY","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},
+  {"lane":"ECONOMIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}}
+]}
+Real names only. ranges: oilPrice 80-180, warRiskInsurance 100-2500, escalationRung 0-6. Output ONLY JSON."""
+
+
+async def _llm_json_async(client: httpx.AsyncClient, system: str, user: str,
+                          temp: float = 0.7, num_predict: int = 800):
+    """Async version of _llm_json — fires a single Ollama JSON call."""
+    try:
+        r = await client.post(
+            f"{OLLAMA_URL_LOCAL}/api/chat",
+            json={
+                "model": OLLAMA_MODEL_LOCAL,
+                "stream": False,
+                "keep_alive": -1,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "options": {"temperature": temp, "num_predict": num_predict, "num_ctx": 3072,
+                            "seed": int.from_bytes(_os.urandom(4), 'big')},
+                "format": "json",
+            },
+            timeout=120.0,
+        )
+        raw = (r.json().get("message", {}) or {}).get("content", "") or ""
+        return _extract_json(raw), raw
+    except Exception as e:
+        return None, str(e)
+
+
+@app.post("/scenario/generate_parallel")
+async def post_scenario_generate_parallel(req: ScenarioGenRequest):
+    """Generate scenario header + 4 turns in concurrent Ollama calls.
+    Wall-clock ~= max(header, turn1..4) instead of sum. Targets ~12-18s vs ~45s serial."""
+    import time
+    t0 = time.time()
+    premise = req.premise.strip()
+
+    async with httpx.AsyncClient() as client:
+        # Step 1: header (small, fast)
+        header_user = (
+            f"Premise: {premise}\n"
+            "Generate the scenario header JSON only (no turns array)."
+        )
+        # Step 2: 4 turn calls in parallel
+        turn_specs = [
+            ("T1 inciting incident — set the scene, establish the threat",     "T1"),
+            ("T2 escalation pressure — Red adapts, Blue under pressure",      "T2"),
+            ("T3 international response + insurance market reaction",          "T3"),
+            ("T4 off-ramp / final escalation decision point",                  "T4"),
+        ]
+        turn_user_prompts = [
+            f"Premise: {premise}\nThis is {label}: {description}.\nGenerate ONLY this turn's JSON (inject + 3 decisions). 3 decisions: DIPLOMATIC, MILITARY, ECONOMIC."
+            for description, label in turn_specs
+        ]
+
+        # Fire ALL FIVE calls in parallel — header + 4 turns concurrently
+        header_task = _llm_json_async(client, HEADER_SYSTEM, header_user, temp=0.7, num_predict=400)
+        turn_tasks = [
+            _llm_json_async(client, TURN_SYSTEM, p, temp=0.7, num_predict=600)
+            for p in turn_user_prompts
+        ]
+        results = await _asyncio_gather(header_task, *turn_tasks)
+
+    header_parsed, header_raw = results[0]
+    if not header_parsed:
+        return {"ok": False, "error": "header_failed", "raw": str(header_raw)[:300]}
+
+    turns = []
+    for i, (parsed, raw) in enumerate(results[1:], start=1):
+        if not parsed or "decisions" not in parsed:
+            return {"ok": False, "error": f"turn_{i}_failed", "raw": str(raw)[:300]}
+        turns.append(parsed)
+
+    scenario = dict(header_parsed)
+    scenario["turns"] = turns
+    elapsed = round(time.time() - t0, 2)
+    return {"ok": True, "scenario": scenario, "parallel": True, "elapsed_sec": elapsed}
 
 
 REDCELL_SYSTEM = """You are an IRGC operations officer running a Red Cell adversary simulation.
