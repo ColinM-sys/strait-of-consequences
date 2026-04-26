@@ -564,6 +564,8 @@ const NAV_CHANNEL = [
   [25.582, 54.921], [25.135, 53.811], [25.770, 52.910],
   [26.362, 52.097], [27.030, 50.988],
 ];
+// Expose for SIM_VESSEL transit-time pathfinding from leaflet-game.js
+if (typeof window !== 'undefined') window.NAV_CHANNEL = NAV_CHANNEL;
 
 function _nearestNavIdx(lat, lng) {
   let best = 0, bestD = Infinity;
@@ -1229,6 +1231,8 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
     if (window.game && typeof window.game.clearSpawnedAdversaries === 'function') {
       window.game.clearSpawnedAdversaries();
     }
+    // 1b. Reset live war-risk insurance delta accumulated during transit
+    window._liveInsuranceDelta = 0;
     // 1b. Toggle off IRGC intel pins if they're showing
     const _pinsBtn = document.getElementById('btn-iran-intel');
     if (_pinsBtn && document.querySelector('.irgc-intel-pin')) _pinsBtn.click();

@@ -75,8 +75,6 @@ function startExercise(scenarioId) {
     dropMineMarkers([
       { lat: 25.20, lng: 56.40, label: 'LIMPET STRIKE — ALPINE CONFIDENCE', note: 'Detonated. Vessel taking on water. (T0)' },
       { lat: 25.18, lng: 56.42, label: 'INERT LIMPET RECOVERED', note: 'Found on Greek-flagged tanker. Forensic match: IRGC.' },
-      { lat: 26.55, lng: 52.20, label: 'HISTORICAL: USS S.B. ROBERTS', note: 'Iranian M-08 mine, 1988. Hull breach + 10 injured.' },
-      { lat: 27.80, lng: 50.30, label: 'HISTORICAL: SS BRIDGETON', note: 'First Tanker War mine strike, 1987.' },
     ]);
     // Zoom to show the mine field
     if (window.game && window.game.map) {
@@ -284,13 +282,19 @@ function syncLegacyStateStrip() {
     // Idle = April 2026 baseline. Brent $106, war-risk elevated to 720 bps after
     // Apr 18 incident, strait CONTESTED. OIL AT RISK is computed dynamically
     // from the actual tankers visible on the AIS tracker (SIM_VESSELS).
+    // Live combat events (red fires, blue counter-fires) bump _liveInsuranceDelta.
     ladder.forEach(r => r.classList.remove('current'));
     if (ladder[0]) ladder[0].classList.add('current');
     const pct = _computeOilAtRiskPct();
+    const liveDelta = (typeof window !== 'undefined' && window._liveInsuranceDelta) || 0;
+    const insBps = 720 + liveDelta;
     if (oil)  oil.textContent  = pct.toFixed(1) + '% world supply';
     if (bpd)  bpd.textContent  = '$106 Brent · ' + pct.toFixed(1) + 'M BPD held up';
-    if (ins)  ins.textContent  = '720 bps';
-    if (clos) clos.textContent = 'CONTESTED';
+    if (ins) {
+      if (insBps >= 1500) { ins.textContent = 'SUSPENDED'; ins.style.color = '#ff4444'; }
+      else                 { ins.textContent = insBps + ' bps'; ins.style.color = insBps > 1000 ? '#ff8833' : ''; }
+    }
+    if (clos) clos.textContent = insBps >= 1500 ? 'CLOSED' : 'CONTESTED';
     return;
   }
   const ind = activeExercise.indicators;

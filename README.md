@@ -148,6 +148,30 @@ All three use the same base model (`llama3.2-vision:11b` running locally on Olla
 - **Coalition flag bar** — 🇬🇧 🇫🇷 🇸🇦 🇺🇳 🇨🇳. Click any flag → popover (auto-clamps to viewport so it never overflows screen edge) with that country's per-scenario position and "WITH BLUE" / "NOT WITH BLUE" badge. UK / France / Saudi auto-flip hostile if alliance cohesion drops below 50.
 - Whole strip flashes amber on every decision pick — visible feedback that the system processed your input.
 
+### Monte-Carlo Variance — Same Plan, Different Outcome Every Run
+
+The wargame is built as a **probabilistic simulation**, not a scripted demo. Same Blue route, same enemy starting picture, but a different damage profile every time. This is what professional wargames actually look like — RAND / CSIS / NWC Newport runs the same scenario dozens of times to characterize the *distribution* of outcomes, not just one path.
+
+**What's randomized per run:**
+
+| Element | Mechanism |
+|---|---|
+| Whether each FAC commits to fire | 25% per-step probabilistic roll |
+| ASCM hit / CIWS intercept | 45% hit, 55% CIWS intercept per missile |
+| Sub torpedo launch | 18% per-step roll, max 1 per transit |
+| Torpedo hit | 30% hit chance |
+| Insurance bumps | follow hit/miss outcomes (+120 bps per fire, +450 if hit, may flip to SUSPENDED) |
+| 🎲 SPAWN ADVERSARIES button | 3–6 random units, random water-only anchor, ±8 km jitter, weighted FAC/sub/mine-layer mix |
+
+**What's deterministic:**
+- Blue formation path (painted route or default)
+- Starting positions of original red OOB
+- DDG counter-fire (auto-kills FACs ≤15 km)
+- DDG mine sweep (auto-detonates ≤5 km)
+- Land-avoidance pathfinding
+
+**Net effect:** Some transits Iran lands a missile and insurance suspends. Some transits CIWS defeats everything and the formation arrives clean. Some have zero incoming. **Global cap of 3 launches per transit** prevents fireworks-show "every FAC fires" failure mode — out of 10+ FACs in the area, typically only 1–2 actually commit. Click 🎲 SPAWN ADVERSARIES once or twice to stack the threat picture and re-run for a different distribution.
+
 ### Combat & Engagement (during transit)
 - **Red AI driving every red unit.** FACs scan for nearest Blue, pursue at ~52 kn (with land-bbox avoidance), launch C-802 ASCMs at ≤40 km. Sub launches Type-53 torpedoes at ≤80 km. **Global cap of 3 launches per transit** + per-unit cap of 1, plus probabilistic per-step roll → realistic suppression dynamics where most FACs never get to fire before being killed. Same Blue route, different damage profile every time = true Monte-Carlo variance.
 - **Land-avoidance pathfinding.** Red AI checks 11 land-bboxes (Iranian coast, Qeshm, Larak, Hengam, the Tunbs, Abu Musa, Musandam Peninsula, UAE/Qatar/Saudi). If pursuit step lands on land, the FAC slides 90° port or starboard. If both blocked, holds position.

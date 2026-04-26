@@ -1971,8 +1971,26 @@ export class LeafletGame {
 // ── Module-level sleep ────────────────────────────────────────────────────────
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ── War-risk insurance bump helper. Called when red fires, blue counter-fires,
+// or anything kinetic happens during transit. Pushes delta into the active
+// exercise if one is running, otherwise into a live-override so the idle
+// state strip still reflects the spike. Re-syncs the legacy state strip.
+function _bumpWarRisk(deltaBps, opts = {}) {
+  if (typeof window === 'undefined') return;
+  if (window.activeExercise && !window.activeExercise.complete && typeof window.activeExercise.applyDelta === 'function') {
+    window.activeExercise.applyDelta({ warRiskInsurance: deltaBps });
+    if (opts.escalationRung && typeof window.activeExercise.applyDelta === 'function') {
+      window.activeExercise.applyDelta({ escalationRung: opts.escalationRung });
+    }
+  } else {
+    window._liveInsuranceDelta = (window._liveInsuranceDelta || 0) + deltaBps;
+  }
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  if (typeof window.renderIndicators === 'function') window.renderIndicators();
+}
+
 // ── Stacking transit-log: single container so banners don't overlap ──────────
-function _transitLog(html, accent = '#44ccff', dwellMs = 3500) {
+function _transitLog(html, accent = '#44ccff', dwellMs = 10000) {
   let log = document.getElementById('transit-log');
   if (!log) {
     log = document.createElement('div');
@@ -1981,13 +1999,13 @@ function _transitLog(html, accent = '#44ccff', dwellMs = 3500) {
     document.body.appendChild(log);
   }
   const row = document.createElement('div');
-  row.style.cssText = `background:rgba(0,8,16,0.94);color:${accent};padding:7px 16px;border:1px solid ${accent}88;border-left:4px solid ${accent};font-family:Courier New,monospace;font-size:11px;letter-spacing:1.3px;box-shadow:0 4px 14px rgba(0,0,0,0.6);transition:opacity 0.5s ease;opacity:1;line-height:1.4`;
+  row.style.cssText = `background:rgba(0,8,16,0.94);color:${accent};padding:7px 16px;border:1px solid ${accent}88;border-left:4px solid ${accent};font-family:Courier New,monospace;font-size:11px;letter-spacing:1.3px;box-shadow:0 4px 14px rgba(0,0,0,0.6);transition:opacity 0.7s ease;opacity:1;line-height:1.4`;
   row.innerHTML = html;
   log.appendChild(row);
-  // Cap concurrent rows to 6 — oldest gets removed when 7th arrives
-  while (log.children.length > 6) log.firstChild.remove();
+  // Cap concurrent rows to 8 — oldest gets removed when 9th arrives
+  while (log.children.length > 8) log.firstChild.remove();
   setTimeout(() => { row.style.opacity = '0'; }, dwellMs);
-  setTimeout(() => { row.remove(); }, dwellMs + 600);
+  setTimeout(() => { row.remove(); }, dwellMs + 800);
 }
 
 // ── Destroyer sweep + engagement helpers (used by executePaintedRoute) ───────
@@ -2019,38 +2037,11 @@ LeafletGame.prototype._engageFac = function (fac) {
   // Remove FAC marker
   if (fac.marker) map.removeLayer(fac.marker);
   _transitLog(`<span style="color:#ff8844">⚔ ${fac.name} NEUTRALIZED</span> · DDG engaged with naval gunfire / ESSM`, '#ff8844', 3500);
+  // Kinetic US response → modest insurance bump
+  _bumpWarRisk(40);
 };
 
-// ── Land bounding boxes — units must not enter these. Conservative coverage of
-// Iranian islands + Iranian/Omani/UAE/Qatar coastlines bordering the strait.
-const LAND_BBOXES = [
-  // Iranian coast strip (north of strait)
-  { latLo: 27.05, latHi: 30.0,  lngLo: 49.0,  lngHi: 60.0 },
-  // Qeshm Island
-  { latLo: 26.55, latHi: 27.05, lngLo: 55.55, lngHi: 56.40 },
-  // Larak Island
-  { latLo: 26.78, latHi: 26.92, lngLo: 56.30, lngHi: 56.46 },
-  // Hengam
-  { latLo: 26.62, latHi: 26.72, lngLo: 55.83, lngHi: 55.95 },
-  // Greater Tunb
-  { latLo: 26.23, latHi: 26.32, lngLo: 55.27, lngHi: 55.36 },
-  // Lesser Tunb
-  { latLo: 26.21, latHi: 26.27, lngLo: 55.10, lngHi: 55.18 },
-  // Abu Musa
-  { latLo: 25.83, latHi: 25.92, lngLo: 54.99, lngHi: 55.07 },
-  // Omani Musandam Peninsula
-  { latLo: 25.85, latHi: 26.55, lngLo: 56.42, lngHi: 56.85 },
-  // UAE coast
-  { latLo: 22.6, latHi: 25.85, lngLo: 51.5,  lngHi: 56.40 },
-  // Qatar / Saudi / Bahrain (north-west Gulf)
-  { latLo: 24.5, latHi: 30.0,  lngLo: 49.5,  lngHi: 51.5 },
-];
-function _isOnLand(lat, lng) {
-  for (const b of LAND_BBOXES) {
-    if (lat >= b.latLo && lat <= b.latHi && lng >= b.lngLo && lng <= b.lngHi) return true;
-  }
-  return false;
-}
+// Land checks reuse the module-level `_isLand` defined near the top of the file.
 
 // ── Spawn adversaries: drop a randomized cohort of red units (Monte-Carlo roll)
 // All spawned units integrate with _redCombatStep so they pursue + fire during
@@ -2157,13 +2148,13 @@ LeafletGame.prototype._redCombatStep = function (bluePositions) {
         let nLng = rLL.lng + dLng/mag * stepDeg;
         // Land-avoidance: if direct step hits land, try sliding 90° port then 90° stbd
         // along the coastline to navigate around islands.
-        if (_isOnLand(nLat, nLng)) {
+        if (_isLand(nLat, nLng)) {
           const perpLat = -dLng/mag * stepDeg;
           const perpLng =  dLat/mag * stepDeg;
           const portLat = rLL.lat + perpLat, portLng = rLL.lng + perpLng;
           const stbdLat = rLL.lat - perpLat, stbdLng = rLL.lng - perpLng;
-          if (!_isOnLand(portLat, portLng))      { nLat = portLat; nLng = portLng; }
-          else if (!_isOnLand(stbdLat, stbdLng)) { nLat = stbdLat; nLng = stbdLng; }
+          if (!_isLand(portLat, portLng))      { nLat = portLat; nLng = portLng; }
+          else if (!_isLand(stbdLat, stbdLng)) { nLat = stbdLat; nLng = stbdLng; }
           else { nLat = rLL.lat; nLng = rLL.lng; }  // both blocked, hold
         }
         r.marker.setLatLng([nLat, nLng]);
@@ -2202,6 +2193,8 @@ LeafletGame.prototype._fireRedShot = function (attacker, target, hitChance, weap
   setTimeout(() => map.removeLayer(tracer), 1200);
 
   _transitLog(`<span style="color:#ff5566">⚠ ${attacker.name} FIRING</span> · ${weapon} INBOUND ON ${target.unit.name}`, '#ff5566', 4000);
+  // Iran fires → war-risk premium spikes immediately on launch detection
+  _bumpWarRisk(120, { escalationRung: 1 });
 
   const hit = Math.random() < hitChance;
   setTimeout(() => {
@@ -2210,6 +2203,8 @@ LeafletGame.prototype._fireRedShot = function (attacker, target, hitChance, weap
       const fx = L.marker([tLL.lat, tLL.lng], { icon: flash, interactive: false, zIndexOffset: 800 }).addTo(map);
       setTimeout(() => map.removeLayer(fx), 1600);
       _transitLog(`<span style="color:#ffaa44">⊠ ${target.unit.name} HIT</span> · ${weapon} from ${attacker.name} · superficial damage, vessel underway`, '#ffaa44', 4500);
+      // Successful hit on Blue → catastrophic premium spike, may suspend cover
+      _bumpWarRisk(450, { escalationRung: 1 });
     } else {
       _transitLog(`<span style="color:#88ddff">⛒ CIWS INTERCEPT</span> · ${weapon} from ${attacker.name} defeated · ${target.unit.name} unharmed`, '#88ddff', 3500);
     }
@@ -2239,33 +2234,31 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
 
   const offsetDeg = 0.40; // ~44km lateral spacing — visibly separated at zoom 7-8
 
-  // Diamond formation, no overlapping units:
-  //          ddgL (port fwd, -20km perp, -11km astern)
-  //                                ╲
-  //   carrier (center deep aft     ╲   TANKER (lead, 0,0)
-  //          0 perp, -45km astern)  ╲
-  //                                ╱
-  //          cruiser (stbd aft, +12km perp, -28km astern)
-  //                                ╲
-  //          ddgR (stbd fwd, +20km perp, -11km astern)
+  // Single-file column formation, all on the painted path centerline so no
+  // ship cuts across land at any segment. Order from front to rear:
+  //   TANKER (lead, on path)
+  //   ddgR (forward escort, slight starboard offset, -22km astern)
+  //   cruiser (~50km astern, centerline)
+  //   carrier (~78km astern, centerline)
+  //   ddgL (TRAILING the carrier — ~105km astern, centerline)
   const seg0 = [path[1][0] - path[0][0], path[1][1] - path[0][1]];
   const seg0mag = Math.hypot(seg0[0], seg0[1]) || 1;
-  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;        // ±20km lateral (DDGs)
+  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;        // ±20km lateral (ddgR only)
   const perp0Lng =  seg0[0] / seg0mag * offsetDeg;
-  const perpHalfLat = -seg0[1] / seg0mag * 0.25;           // ±28km lateral (cruiser)
-  const perpHalfLng =  seg0[0] / seg0mag * 0.25;
-  const trailLat = -seg0[0] / seg0mag * 0.20;              // -22km astern (DDGs)
+  const trailLat = -seg0[0] / seg0mag * 0.20;              // -22km astern (ddgR)
   const trailLng = -seg0[1] / seg0mag * 0.20;
   const aftLat   = -seg0[0] / seg0mag * 0.45;              // -50km astern (cruiser)
   const aftLng   = -seg0[1] / seg0mag * 0.45;
   const deepLat  = -seg0[0] / seg0mag * 0.70;              // -78km astern (carrier)
   const deepLng  = -seg0[1] / seg0mag * 0.70;
+  const tailLat  = -seg0[0] / seg0mag * 0.95;              // -105km astern (ddgL trailing)
+  const tailLng  = -seg0[1] / seg0mag * 0.95;
   const start = path[0];
   if (tanker.marker)  tanker.marker.setLatLng(start);
-  if (ddgL.marker)    ddgL.marker.setLatLng([start[0] - perp0Lat + trailLat, start[1] - perp0Lng + trailLng]);
   if (ddgR.marker)    ddgR.marker.setLatLng([start[0] + perp0Lat + trailLat, start[1] + perp0Lng + trailLng]);
-  if (cruiser && cruiser.marker) cruiser.marker.setLatLng([start[0] + perpHalfLat + aftLat, start[1] + perpHalfLng + aftLng]);
+  if (cruiser && cruiser.marker) cruiser.marker.setLatLng([start[0] + aftLat, start[1] + aftLng]);
   if (carrier && carrier.marker) carrier.marker.setLatLng([start[0] + deepLat, start[1] + deepLng]);
+  if (ddgL.marker)    ddgL.marker.setLatLng([start[0] + tailLat, start[1] + tailLng]);
 
   // Fit map to the entire route so everything is visible from the start
   const bounds = L.latLngBounds(path);
@@ -2310,18 +2303,18 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
       const t = s / STEPS;
       const lat = from[0] + dLat * t;
       const lng = from[1] + dLng * t;
-      // Per-segment offsets — match diamond formation from initial layout
-      const perpHalfLatSeg = -dLng / mag * 0.25;        // ±28km lateral (cruiser)
-      const perpHalfLngSeg =  dLat / mag * 0.25;
+      // Per-segment offsets — column formation, all on the path centerline
       const aftLatSeg  = -dLat / mag * 0.45;            // -50km astern (cruiser)
       const aftLngSeg  = -dLng / mag * 0.45;
       const deepLatSeg = -dLat / mag * 0.70;            // -78km astern (carrier)
       const deepLngSeg = -dLng / mag * 0.70;
+      const tailLatSeg = -dLat / mag * 0.95;            // -105km astern (ddgL — trails carrier)
+      const tailLngSeg = -dLng / mag * 0.95;
       if (tanker.marker)              tanker.marker.setLatLng([lat, lng]);
-      if (ddgL.marker)                ddgL.marker.setLatLng([lat - perpLat + trailLatSeg, lng - perpLng + trailLngSeg]);
       if (ddgR.marker)                ddgR.marker.setLatLng([lat + perpLat + trailLatSeg, lng + perpLng + trailLngSeg]);
-      if (cruiser && cruiser.marker)  cruiser.marker.setLatLng([lat + perpHalfLatSeg + aftLatSeg, lng + perpHalfLngSeg + aftLngSeg]);
+      if (cruiser && cruiser.marker)  cruiser.marker.setLatLng([lat + aftLatSeg, lng + aftLngSeg]);
       if (carrier && carrier.marker)  carrier.marker.setLatLng([lat + deepLatSeg, lng + deepLngSeg]);
+      if (ddgL.marker)                ddgL.marker.setLatLng([lat + tailLatSeg, lng + tailLngSeg]);
 
       // ── Mine sweep + FAC engagement: destroyers kill mines (≤5km) and IRGC FACs (≤15km)
       const ddgPositions = [ddgL, ddgR].filter(d => d && d.marker).map(d => d.marker.getLatLng());
@@ -2354,20 +2347,37 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
       // Append to green trail (every 3rd step to keep it light)
       if (s % 3 === 0) { trailPts.push([lat, lng]); trail.setLatLngs(trailPts); }
 
-      // Drift civilian SIM_VESSELS along their nav direction so they progress
-      // through the strait + the OIL AT RISK number drops as they exit.
-      if (window.SIM_VESSELS) {
+      // SIM_VESSELS follow the NAV_CHANNEL waypoint chain — stays in water
+      // by construction since waypoints are pre-verified water-only. Each ship
+      // advances toward NAV_CHANNEL[_navIdx + _navDir]; on arrival, _navIdx
+      // increments. Once at the end, ship has exited and stops.
+      if (window.SIM_VESSELS && window.NAV_CHANNEL) {
+        const NAV = window.NAV_CHANNEL;
+        const STEP_DEG = 0.012;
         for (const sv of window.SIM_VESSELS) {
           if (sv._cleared) continue;
-          const navDir = sv._navDir || 1;  // +1 inbound (westward), -1 outbound (eastward)
-          const driftLng = -0.012 * navDir; // ~1.3km/step westward for inbound
-          const driftLat = 0;
-          const newLat = (sv._currentLat ?? sv.lat) + driftLat;
-          const newLng = (sv._currentLng ?? sv.lng) + driftLng;
-          sv._currentLat = newLat;
-          sv._currentLng = newLng;
-          if (sv._marker) sv._marker.setLatLng([newLat, newLng]);
-          if (sv._label)  sv._label.setLatLng([newLat, newLng]);
+          const navDir = sv._navDir || 1;
+          const targetIdx = (sv._navIdx ?? 5) + navDir;
+          if (targetIdx < 0 || targetIdx >= NAV.length) continue; // already exited
+          const target = NAV[targetIdx];
+          const baseLat = sv._currentLat ?? sv.lat;
+          const baseLng = sv._currentLng ?? sv.lng;
+          const dLat = target[0] - baseLat;
+          const dLng = target[1] - baseLng;
+          const dist = Math.hypot(dLat, dLng) || 0.0001;
+          let nLat, nLng;
+          if (dist < STEP_DEG) {
+            // arrived at this waypoint — snap and advance to next
+            nLat = target[0]; nLng = target[1];
+            sv._navIdx = targetIdx;
+          } else {
+            nLat = baseLat + (dLat / dist) * STEP_DEG;
+            nLng = baseLng + (dLng / dist) * STEP_DEG;
+          }
+          sv._currentLat = nLat;
+          sv._currentLng = nLng;
+          if (sv._marker) sv._marker.setLatLng([nLat, nLng]);
+          if (sv._label)  sv._label.setLatLng([nLat, nLng]);
         }
       }
       // Recompute OIL AT RISK from updated vessel positions every 10 steps
