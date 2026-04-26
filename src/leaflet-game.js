@@ -2201,6 +2201,17 @@ function _logAarEvent(state, evt) {
   if (!state) return;
   if (!state.aar) state.aar = { events: [], startTime: Date.now() };
   state.aar.events.push({ t: Date.now() - state.aar.startTime, ...evt });
+  // Dispatch to live escalation ladder so combat events visibly move the rung
+  try {
+    if (typeof window !== 'undefined' && typeof window._bumpLiveEscalation === 'function') {
+      const t = (evt && evt.type) || '';
+      if (t === 'fire')           window._bumpLiveEscalation(+1, 'red fired');
+      else if (t === 'fac_kill')  window._bumpLiveEscalation(+1, 'fac neutralized');
+      else if (t === 'mine_sweep')window._bumpLiveEscalation(+1, 'mine encountered');
+      else if (t === 'sub_kill')  window._bumpLiveEscalation(+2, 'sub neutralized');
+      else if (t === 'hit')       window._bumpLiveEscalation(+2, 'blue ship hit');
+    }
+  } catch (e) {}
 }
 
 function _renderAAR(state, opts = {}) {
