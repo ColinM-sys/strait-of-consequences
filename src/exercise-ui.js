@@ -29,7 +29,11 @@ function _clearScenarioMarkers() {
     _scenarioMapMarkers.forEach(m => { try { window.game.map.removeLayer(m); } catch (e) {} });
   }
   _scenarioMapMarkers.length = 0;
+  if (window._activeMines) window._activeMines.length = 0;
 }
+
+// Global mine registry — destroyer transit code reads this to sweep mines.
+window._activeMines = window._activeMines || [];
 
 function dropMineMarkers(positions) {
   if (!window.game || !window.game.map) return;
@@ -46,6 +50,8 @@ function dropMineMarkers(positions) {
     // Pulsing kill-radius circle
     const ring = L.circle([p.lat, p.lng], { radius: 1200, color:'#ff2200', weight:1.5, dashArray:'4 4', fillOpacity:0.10, interactive:false }).addTo(map);
     _addScenarioMarker(ring);
+    // Register in mine registry for the destroyer-transit sweep system
+    window._activeMines.push({ lat: p.lat, lng: p.lng, label: p.label, marker: m, ring });
   }
 }
 
@@ -86,13 +92,133 @@ function endExercise() {
   document.getElementById('exercise-overlay').style.display = 'none';
   if (typeof restoreAllVessels === 'function') restoreAllVessels();
   _clearScenarioMarkers();
+  syncLegacyStateStrip();
   renderIndicators();
+}
+
+// Per-scenario coalition positions. Each entry: { flagId: 'description shown on click' }.
+// Hostile = frames the flag in red. Defaults applied if scenario doesn't override.
+const _COALITION_POSITIONS_DEFAULT = {
+  'cf-uk': { hostile:false, note:'Royal Navy escort assets available. Strong attribution-statement co-signer; cautious on kinetic.' },
+  'cf-fr': { hostile:false, note:'Marine Nationale FREMM available. Will co-sign attribution; prefers UN process.' },
+  'cf-sa': { hostile:false, note:'Aramco export protection is the priority. Wants U.S. military commitment to strait.' },
+  'cf-un': { hostile:false, note:'UNSC emergency session can be triggered. Russia/China veto blocks binding action; non-binding statements possible.' },
+  'cf-cn': { hostile:true,  note:'Beijing prefers ambiguity. Will not co-sign attribution. Pulls Iran toward off-ramp only when own crude flow is at risk.' },
+};
+const _COALITION_POSITIONS_BY_SCENARIO = {
+  seizure: {
+    'cf-cn': { hostile:true,  note:'China declines to co-sign attribution against Iran in this scenario. Beijing\'s ambiguity is part of the IRGC information strategy.' },
+    'cf-sa': { hostile:false, note:'Riyadh wants visible Blue military presence — Aramco shipments are vulnerable while GULF MERIDIAN crisis continues.' },
+  },
+  mining: {
+    'cf-sa': { hostile:false, note:'Riyadh independently moves a destroyer toward the strait by Turn 2. Demands U.S. action; weighing unilateral options if Blue hesitates.' },
+    'cf-cn': { hostile:true,  note:'Beijing endorses Tehran\'s Turn 3 dialogue offer. Indicates Chinese willingness to provide Iran diplomatic cover.' },
+  },
+  strike: {
+    'cf-uk': { hostile:false, note:'UK explicitly wants deterrent strike (Turn 3 split). Strongest co-signer on attribution.' },
+    'cf-cn': { hostile:true,  note:'China calls for "restraint on all sides" — equivocates between Blue and Tehran on the missile attack.' },
+    'cf-sa': { hostile:false, note:'Riyadh wants strikes AND continued convoy operations indefinitely. Most aggressive Blue partner this scenario.' },
+  },
+  airbase: {
+    'cf-cn': { hostile:true,  note:'Beijing publicly denied the joint-exercise cover story (Turn 1 demarche). Privately constrained the China-flagged operator.' },
+    'cf-sa': { hostile:false, note:'Saudi ISR contributions accelerate after VLM reveals the strike package. Riyadh wants pre-emptive action.' },
+  },
+};
+
+function _coalitionPositionFor(flagId) {
+  const ex = window.activeExercise;
+  const sc = ex && ex.scenario && _COALITION_POSITIONS_BY_SCENARIO[ex.scenario.id];
+  return (sc && sc[flagId]) || _COALITION_POSITIONS_DEFAULT[flagId];
+}
+
+function _hostileFromCohesion(flagId) {
+  const ex = window.activeExercise;
+  if (!ex) return false;
+  const cohesion = ex.indicators.allianceCohesion ?? 100;
+  // Below 50, alliance partners (UK, France, Saudi) start tipping hostile
+  if (cohesion < 50 && ['cf-uk','cf-fr','cf-sa'].includes(flagId)) return true;
+  return false;
+}
+
+function _showCoalitionPopover(flagEl, flagId) {
+  document.querySelectorAll('.coalition-popover').forEach(p => p.remove());
+  const pos = _coalitionPositionFor(flagId);
+  if (!pos) return;
+  const rect = flagEl.getBoundingClientRect();
+  const isHostile = pos.hostile || _hostileFromCohesion(flagId);
+  const color = isHostile ? '#ff6666' : '#66ff99';
+  const popover = document.createElement('div');
+  popover.className = 'coalition-popover';
+  popover.style.cssText = `position:fixed;top:${rect.bottom + 8}px;left:${Math.max(8, rect.left - 80)}px;width:280px;background:rgba(0,8,16,0.97);border:1px solid ${color};border-left:4px solid ${color};padding:10px 12px;z-index:9000;font-family:Courier New,monospace;font-size:11px;color:#cce0ff;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
+  popover.innerHTML = `<div style="color:${color};font-size:10px;letter-spacing:2px;margin-bottom:4px">${flagEl.title.toUpperCase()} · ${isHostile ? 'NOT WITH BLUE' : 'WITH BLUE'}</div>${pos.note}`;
+  document.body.appendChild(popover);
+  setTimeout(() => {
+    document.addEventListener('click', function once(ev) {
+      if (!popover.contains(ev.target)) { popover.remove(); document.removeEventListener('click', once, true); }
+    }, true);
+  }, 50);
+}
+
+// Wire flag clicks once
+let _coalitionWired = false;
+function _wireCoalitionFlags() {
+  if (_coalitionWired) return;
+  document.querySelectorAll('#coalition-bar .cflag').forEach(flag => {
+    flag.style.cursor = 'pointer';
+    flag.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      _showCoalitionPopover(flag, flag.id);
+    });
+  });
+  _coalitionWired = true;
+}
+
+// Sync the legacy state strip (escalation ladder + econ bar + coalition) to
+// activeExercise.indicators. Called from startExercise / renderActiveExercise / endExercise.
+function syncLegacyStateStrip() {
+  // Wire coalition click handlers ALWAYS — even when idle (no exercise active),
+  // judges should be able to click a flag and read its general position.
+  _wireCoalitionFlags();
+  // Update hostile state on each flag based on scenario + indicator state
+  document.querySelectorAll('#coalition-bar .cflag').forEach(flag => {
+    const pos = _coalitionPositionFor(flag.id);
+    const isHostile = (pos && pos.hostile) || _hostileFromCohesion(flag.id);
+    flag.classList.toggle('hostile', isHostile);
+  });
+  const ladder = document.querySelectorAll('#ladder-rungs .rung');
+  const oil  = document.getElementById('econ-oil');
+  const bpd  = document.getElementById('econ-bpd');
+  const ins  = document.getElementById('econ-insurance');
+  const clos = document.getElementById('econ-closure');
+
+  if (!activeExercise) {
+    // Idle defaults
+    ladder.forEach(r => r.classList.remove('current'));
+    if (ladder[0]) ladder[0].classList.add('current');
+    if (oil)  oil.textContent  = '—';
+    if (bpd)  bpd.textContent  = '18.5M BPD';
+    if (ins)  ins.textContent  = '—';
+    if (clos) clos.textContent = 'OPEN';
+    return;
+  }
+  const ind = activeExercise.indicators;
+  const rung = Math.max(0, Math.min(5, ind.escalationRung || 0));
+  ladder.forEach((r, idx) => {
+    r.classList.toggle('current', idx === rung);
+  });
+  if (oil)  oil.textContent  = '$' + ind.oilPrice + '/bbl';
+  if (bpd)  bpd.textContent  = (ind.iranCoercion || 0) + '% IRAN COERCION';
+  if (ins)  ins.textContent  = ind.warRiskInsurance + ' bps';
+  // Map rung → strait closure status
+  const closure = rung >= 4 ? 'CLOSED' : rung >= 2 ? 'CONTESTED' : 'OPEN';
+  if (clos) clos.textContent = closure;
 }
 
 function renderActiveExercise() {
   if (!activeExercise) return;
   const ex = activeExercise;
   const turn = ex.currentTurn();
+  syncLegacyStateStrip();
   const aiBadge = turn._aiGenerated
     ? `<span style="display:inline-block;background:rgba(102,255,153,0.16);color:#66ff99;font-size:9px;letter-spacing:2px;padding:2px 6px;border:1px solid #66ff9966;margin-left:8px">⟳ AI-ADJUDICATED</span>`
     : turn._branched
@@ -278,7 +404,9 @@ function highlightAffectedParties(text) {
   const map = window.game.map;
   const lower = (text || '').toLowerCase();
   const entities = [];
-  // Known location anchors (Iranian + Gulf)
+  // Known location anchors. `noZoom: true` means: still pulse if mentioned, but DON'T
+  // drag the camera there (Tehran is 1500 km north of the theater — mentions are usually
+  // shorthand for "the regime", not a literal location worth flying to).
   const places = [
     { keys:['bandar abbas','bandar-abbas','oikb'],   lat:27.218, lng:56.378, label:'Bandar Abbas' },
     { keys:['fujairah'],                              lat:25.123, lng:56.348, label:'Fujairah' },
@@ -288,7 +416,7 @@ function highlightAffectedParties(text) {
     { keys:['ras tanura'],                            lat:26.71,  lng:50.16,  label:'Ras Tanura' },
     { keys:['jebel ali'],                             lat:25.00,  lng:55.05,  label:'Jebel Ali' },
     { keys:['kish'],                                  lat:26.53,  lng:53.98,  label:'Kish Island' },
-    { keys:['tehran'],                                lat:35.69,  lng:51.42,  label:'Tehran' },
+    { keys:['tehran'],                                lat:35.69,  lng:51.42,  label:'Tehran', noZoom:true },
   ];
   for (const p of places) {
     if (p.keys.some(k => lower.includes(k))) entities.push(p);
@@ -320,12 +448,15 @@ function highlightAffectedParties(text) {
     pulseAt(map, e.lat, e.lng, e.label);
   }
 
-  // Zoom map to bounding box of all mentioned entities
-  if (entities.length === 1) {
-    map.flyTo([entities[0].lat, entities[0].lng], 9, { duration: 1.0 });
-  } else {
-    const bounds = L.latLngBounds(entities.map(e => [e.lat, e.lng]));
+  // Zoom map only on entities that aren't flagged noZoom (e.g. Tehran). Pulse still
+  // happens for everyone above; this just controls camera bounds.
+  const zoomable = entities.filter(e => !e.noZoom);
+  if (zoomable.length >= 2) {
+    const bounds = L.latLngBounds(zoomable.map(e => [e.lat, e.lng]));
     map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 9, duration: 1.2 });
+  } else if (zoomable.length === 1) {
+    // Single zoomable entity — fly to it
+    map.flyTo([zoomable[0].lat, zoomable[0].lng], 9, { duration: 1.0 });
   }
 
   // Connect with a faint line if 2+ entities (shows the relationship)
@@ -389,7 +520,7 @@ function showAIAdjudicating(on) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'ai-adjudicating';
-    el.style.cssText = 'position:fixed;top:90px;left:50%;transform:translateX(-50%);background:rgba(0,8,16,0.95);color:#66ff99;padding:8px 18px;border:1px solid #66ff9966;border-left:4px solid #66ff99;z-index:550;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+    el.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#66ff99;padding:8px 18px;border:1px solid #66ff9966;border-left:4px solid #66ff99;z-index:550;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
     el.innerHTML = '⟳ AI ADJUDICATING NEXT TURN — llama3.1:8b';
     document.body.appendChild(el);
   }
@@ -447,6 +578,7 @@ function renderOverlay() {
 
 function renderAAR() {
   if (!activeExercise) return;
+  syncLegacyStateStrip();
   const ex = activeExercise;
   const ind0 = ex.scenario.initialIndicators;
   const indN = ex.indicators;
@@ -551,4 +683,5 @@ window.renderScenarioCards = renderScenarioCards;
 window.startExercise = startExercise;
 window.endExercise = endExercise;
 window.renderActiveExercise = renderActiveExercise;
+window.syncLegacyStateStrip = syncLegacyStateStrip;
 Object.defineProperty(window, 'activeExercise', { get: () => activeExercise });

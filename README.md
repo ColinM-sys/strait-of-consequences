@@ -8,6 +8,22 @@ Format follows the canonical professional wargame pattern (RAND / CSIS / NWC New
 
 ---
 
+## What Sets This Apart (Judge Highlights)
+
+- **Fully air-gapped local AI.** Every model call (Llama 3.1 8B for adjudication / chat, Llama 3.2 Vision 11B for satellite analysis) runs on the local GPU via Ollama. Zero cloud, zero API keys, zero telemetry. Reproducible, deployable, classified-environment-compatible.
+- **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) derived from `llama3.2-vision:11b` with hand-tuned system prompts that (a) defeat the base model's refusal-to-count-military-assets behavior and (b) embed visual heuristics for vessel/aircraft detection (wake-based vessel ID, swept-wing aircraft silhouettes). Same base model, different operator-tuned overlays.
+- **Hand-authored branching decision tree.** Turn 1 MILITARY pick → ESCALATION path; Turn 1 DIPLOMATIC pick → DE-ESCALATION path. **40 alternate decisions hand-written** across 4 scenarios (8 branch turns × 5 DIME+ decisions). Deterministic, demo-safe, every playthrough actually diverges.
+- **Live AI adjudicator endpoint** (`POST /scenario/next_turn`). Llama 3.1 8B reads scenario state + Blue's specific pick + indicator history and generates a fresh inject + 5 brand-new DIME+ decisions on the fly. Strict JSON-schema validation with graceful fallback. Built but disabled by default for demo speed (8B is 25-35s/turn on a Lenovo laptop GPU); enable when a faster GPU is reachable.
+- **Live map visualization on every decision.** Picked decision text + the next turn's content are parsed for known entities (Bandar Abbas / Fujairah / Strait of Hormuz / Larak / Qeshm / Ras Tanura / Jebel Ali / Kish + every named SIM_VESSEL + every game unit). Map flies to bounding box, pulses every mentioned location with green rings, draws connecting lines, dims all unmentioned ships to 18% (SDA-style key-asset isolation).
+- **20-category ship-actor taxonomy** with per-ship stakeholder impact bars. Click ▶ STRIKE CONSEQUENCES on any vessel — opens a wide left-side panel with the actual stakeholder exposure (e.g., "🇨🇳 China 96/100 — Primary buyer, 2.1M bbl Aramco crude" on a China-bound Saudi VLCC). Per-vessel, not per-category-generic.
+- **Historical mining + attack overlay** with **6 real geocoded incidents** (USS Samuel B. Roberts 1988, SS Bridgeton 1987, Fujairah 4-tanker limpet 2019, Front Altair / Kokuka Courageous 2019, Stena Impero 2019, M. Star 2010). Every Blue transit simulation auto-detects when the formation passes within 90 km of any of these and flashes the incident description + pulses the marker.
+- **Painted-route tanker transit simulation.** Paint a custom route through the strait → MV PACIFIC LION (tanker) animates along it with two DDGs flanking ~20 km port/starboard, ~11 km astern, headings auto-rotating per segment. End report scored against the historical-incident proximity layer.
+- **Interactive VLM exercise.** AIRBASE INTEL scenario INTELLIGENCE decisions auto-fly the map to Bandar Abbas, drop the user into draw-to-select mode, and run live Llama 3.2 Vision 11B analysis on a captured Sentinel-2 / ArcGIS frame the user picked. Results stream back into the exercise sitrep.
+- **12 unit tests** covering the pure-logic modules (state machine, scenario data validation, ship taxonomy). Wargame logic is verified, not vibes.
+- **Iran-only airport overlay.** Red-team focus filter: narrowed from 91 Gulf-region airports (Iran/Iraq/UAE/Saudi/Pakistan/etc.) down to 14 IRIAF / IRGC AF airports. Other Gulf-state friendlies excluded.
+
+---
+
 ## What It Does
 
 ### Core Exercise Loop

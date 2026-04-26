@@ -825,7 +825,42 @@ function restoreAllVessels() {
 window.dimNonKeyVessels = dimNonKeyVessels;
 window.restoreAllVessels = restoreAllVessels;
 
+// Map event type → exercise indicator deltas. When a ship animation fires during
+// an active exercise, these auto-bump the indicators so the escalation ladder
+// reflects what's happening on the map in real time.
+const _IMPACT_DELTAS = {
+  STRIKE:        { escalationRung:+1, warRiskInsurance:+25, oilPrice:+2, iranCoercion:+3 },
+  MINED:         { escalationRung:+1, warRiskInsurance:+50, oilPrice:+3 },
+  OIL_SLICK:     { warRiskInsurance:+30, oilPrice:+3, attributionConfidence:+2 },
+  BOARDED:       { warRiskInsurance:+10, iranCoercion:+2 },
+  DISABLED:      { warRiskInsurance:+15, iranCoercion:+1 },
+  SINKING:       { escalationRung:+1, warRiskInsurance:+40, oilPrice:+4 },
+  CONVOY_FORM:   { warRiskInsurance:-15, allianceCohesion:+2 },
+  TRANSIT_HALT:  { escalationRung:+1, warRiskInsurance:+60, oilPrice:+5 },
+};
+function _applyImpactDeltas(type) {
+  const ex = window.activeExercise;
+  if (!ex || ex.complete) return;
+  const delta = _IMPACT_DELTAS[type];
+  if (!delta) return;
+  if (typeof ex.applyDelta === 'function') {
+    ex.applyDelta(delta);
+  } else {
+    for (const [k, v] of Object.entries(delta)) {
+      ex.indicators[k] = (ex.indicators[k] || 0) + v;
+      if (['allianceCohesion','attributionConfidence','iranCoercion'].includes(k)) {
+        ex.indicators[k] = Math.max(0, Math.min(100, ex.indicators[k]));
+      }
+    }
+  }
+  // Force the strip + indicator panel to repaint
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  if (typeof window.renderIndicators === 'function') window.renderIndicators();
+}
+
 function animateVesselImpact(mmsi, type) {
+  // Reflect the impact on exercise indicators (escalation ladder + econ bar update)
+  _applyImpactDeltas(type);
   if (!_aisVessels) return;
   const entry = _aisVessels.get(mmsi);
   if (!entry || !entry.marker) return;
@@ -916,7 +951,7 @@ function animateVesselImpact(mmsi, type) {
         banner = document.createElement('div');
         banner.id = 'transit-halt-banner';
         banner.textContent = '⚠ STRAIT TRANSIT SUSPENDED';
-        banner.style.cssText = 'position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(160,0,0,0.85);color:#fff;padding:8px 18px;letter-spacing:3px;z-index:500;font-family:Courier New,monospace;font-weight:bold;border:1px solid #ff4444;text-shadow:0 0 8px #ff0000';
+        banner.style.cssText = 'position:absolute;bottom:130px;left:20px;background:rgba(160,0,0,0.85);color:#fff;padding:8px 18px;letter-spacing:3px;z-index:500;font-family:Courier New,monospace;font-weight:bold;border:1px solid #ff4444;text-shadow:0 0 8px #ff0000';
         document.getElementById('map').appendChild(banner);
         setTimeout(() => banner.remove(), 5000);
       }
@@ -1081,9 +1116,19 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
   });
   const execBtn = document.getElementById('btn-exec-route');
   if (execBtn) execBtn.addEventListener('click', () => {
-    if (window.game && typeof window.game.executePaintedRoute === 'function') {
-      window.game.executePaintedRoute();
+    if (!window.game || typeof window.game.executePaintedRoute !== 'function') return;
+    const path = window.game._lastPaintedPath;
+    if (!path || path.length < 2) {
+      // Visible feedback so the failure mode is obvious
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#ffaa44;padding:10px 20px;border:1px solid #ffaa4488;border-left:4px solid #ffaa44;z-index:9000;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+      banner.innerHTML = '⚠ NO PAINTED ROUTE — click 🟡 PATH (paint toolbar, top-right of map), then click-drag a route on the water. Then hit ▶ EXECUTE PAINTED ROUTE again.';
+      document.body.appendChild(banner);
+      setTimeout(() => banner.style.opacity = '0', 4500);
+      setTimeout(() => banner.remove(), 5200);
+      return;
     }
+    window.game.executePaintedRoute();
   });
 
   // Hide-all-ships toggle (for clean map screenshots)
@@ -2551,12 +2596,22 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 // Exercise UI init
 if (typeof renderScenarioCards === 'function') {
   renderScenarioCards();
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
   const endBtn = document.getElementById('exercise-end-btn');
   if (endBtn) endBtn.addEventListener('click', endExercise);
   const minBtn = document.getElementById('exercise-overlay-min');
   if (minBtn) minBtn.addEventListener('click', () => {
     const ov = document.getElementById('exercise-overlay');
-    ov.style.maxHeight = ov.style.maxHeight === '40px' ? '280px' : '40px';
+    const collapsed = ov.style.maxHeight === '40px';
+    if (collapsed) {
+      ov.style.maxHeight = '65vh';
+      ov.style.minHeight = '200px';
+      minBtn.textContent = '▾';
+    } else {
+      ov.style.maxHeight = '40px';
+      ov.style.minHeight = '40px';
+      minBtn.textContent = '▴';
+    }
   });
 } else {
   console.warn('Exercise UI not loaded');

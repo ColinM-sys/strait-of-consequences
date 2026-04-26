@@ -683,7 +683,6 @@
 <div id="paint-toolbar">
   <button id="btn-paint">✏ PATH</button>
   <button id="btn-paint-boundary">⬛ LAND</button>
-  <button id="btn-paint-battery">🔴 BATTERY</button>
   <button id="btn-paint-clear">✕ CLEAR</button>
 </div>
 <button id="btn-present" title="Toggle presentation mode for big screen">⛶ PRESENT</button>
@@ -817,8 +816,11 @@
   </div>
   <div id="panel-exercise">
   <!-- Hidden legacy wargame DOM — kept so existing JS handlers don't crash on null. Will be removed once those references are stripped. -->
-  <div id="legacy-wargame-ui" style="display:none">
-    <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
+  <!-- Always-visible state strip: econ bar + escalation ladder + coalition bar.
+       The other legacy blocks (turn-bar / scenario-section / unit-info / ai-log / controls)
+       stay in the DOM but display:none so existing JS handlers don't crash on null. -->
+  <div id="legacy-wargame-ui">
+    <div id="turn-bar" style="display:none"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
     <div id="strategic-section">
       <div id="econ-bar">
         <div class="econ-item"><span class="econ-label">OIL AT RISK</span><span class="econ-value" id="econ-oil">21%</span><span class="econ-sub" id="econ-bpd">18.5M BPD</span></div>
@@ -836,10 +838,10 @@
         <span class="cflag" id="cf-uk" title="UK">🇬🇧</span><span class="cflag" id="cf-fr" title="France">🇫🇷</span><span class="cflag" id="cf-sa" title="Saudi">🇸🇦</span><span class="cflag" id="cf-un" title="UN">🇺🇳</span><span class="cflag hostile" id="cf-cn" title="China">🇨🇳</span>
       </div>
     </div>
-    <div id="scenario-section"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
-    <div id="unit-info"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
-    <div id="ai-log"><div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Legacy log.</div></div></div>
-    <div id="controls">
+    <div id="scenario-section" style="display:none"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
+    <div id="unit-info" style="display:none"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
+    <div id="ai-log" style="display:none"><div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Legacy log.</div></div></div>
+    <div id="controls" style="display:none">
       <button class="ctrl" id="btn-demo">▶▶ DEMO</button>
       <div id="demo-progress"></div>
       <button class="ctrl" id="btn-end-turn">▶ END TURN</button>
@@ -971,12 +973,12 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=98"></script>
-<script src="src/ship-taxonomy.js?v=98"></script>
-<script src="src/scenarios.js?v=98"></script>
-<script src="src/exercise.js?v=98"></script>
-<script src="src/exercise-ui.js?v=98"></script>
-<script type="module" src="src/main.js?v=98"></script>
+<script src="src/historical-incidents.js?v=120"></script>
+<script src="src/ship-taxonomy.js?v=120"></script>
+<script src="src/scenarios.js?v=120"></script>
+<script src="src/exercise.js?v=120"></script>
+<script src="src/exercise-ui.js?v=120"></script>
+<script type="module" src="src/main.js?v=120"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>

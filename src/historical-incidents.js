@@ -115,10 +115,10 @@ function hideHistoricalIncidents() {
 }
 
 async function simulateBlueTransit() {
-  // Show historical markers if hidden (judges should see them during the demo)
-  if (_histMarkers.length === 0) renderHistoricalIncidents();
   if (!window.game || typeof window.game.executePaintedRoute !== 'function') return;
-  // Use painted path if user drew one, else fallback to default route
+  // Historical markers are NOT auto-shown — user toggles them via the
+  // ⚠ MINE / ATTACK HISTORY button in the action bar. Proximity alerts still
+  // fire during transit whether or not the markers are visible.
   const painted = window.game._lastPaintedPath;
   const path = (painted && painted.length >= 2) ? painted : BLUE_TRANSIT_ROUTE;
   window.game.executePaintedRoute({ path });
@@ -141,7 +141,7 @@ function _flashIncident(inc, distKm) {
 
   // Sitrep banner
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:90px;left:50%;transform:translateX(-50%);background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ' + inc.color + ';border-left:5px solid ' + inc.color + ';z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+  banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ' + inc.color + ';border-left:5px solid ' + inc.color + ';z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
   banner.innerHTML = `
     <div style="color:${inc.color};font-size:10px;letter-spacing:2px;margin-bottom:2px">⚠ PROXIMITY ALERT — ${inc.type} · ${distKm.toFixed(0)} KM</div>
     <div style="color:#fff;font-weight:bold;margin-bottom:4px">${inc.name} · ${inc.date}</div>

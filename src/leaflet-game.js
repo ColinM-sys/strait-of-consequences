@@ -1963,6 +1963,49 @@ export class LeafletGame {
 // ── Module-level sleep ────────────────────────────────────────────────────────
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ── Destroyer sweep + engagement helpers (used by executePaintedRoute) ───────
+LeafletGame.prototype._sweepMine = function (mine) {
+  const map = this._map;
+  // Detonation flash
+  const flashIcon = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:30px;animation:fxBoom 1.2s ease-out forwards;text-shadow:0 0 20px #44ccff">💥</div>', iconSize:[30,30] });
+  const fx = L.marker([mine.lat, mine.lng], { icon: flashIcon, interactive: false, zIndexOffset: 800 }).addTo(map);
+  setTimeout(() => map.removeLayer(fx), 1500);
+  // Remove the mine marker + its kill-radius ring
+  if (mine.marker) map.removeLayer(mine.marker);
+  if (mine.ring)   map.removeLayer(mine.ring);
+  // Sweep banner
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#44ccff;padding:8px 18px;border:1px solid #44ccff88;border-left:4px solid #44ccff;z-index:600;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+  banner.innerHTML = `<span style="color:#44ccff">⚓ MINE NEUTRALIZED</span> · ${mine.label || 'IRGC LIMPET'} · MCM sweep complete`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.style.opacity = '0', 2200);
+  setTimeout(() => banner.remove(), 2900);
+};
+
+LeafletGame.prototype._engageFac = function (fac) {
+  if (fac.destroyed) return;
+  fac.destroyed = true;
+  const map = this._map;
+  const ll = fac.marker ? fac.marker.getLatLng() : null;
+  if (!ll) return;
+  // Explosion at FAC location
+  const flashIcon = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:42px;animation:fxBoom 1.5s ease-out forwards;text-shadow:0 0 22px #ff3300">💥</div>', iconSize:[42,42] });
+  const fx = L.marker([ll.lat, ll.lng], { icon: flashIcon, interactive: false, zIndexOffset: 800 }).addTo(map);
+  setTimeout(() => map.removeLayer(fx), 1800);
+  // Wreck icon
+  const wreck = L.divIcon({ className:'fx-wreck', html:'<div style="font-size:18px;color:#444;text-shadow:0 0 4px #000">⊗</div>', iconSize:[20,20] });
+  L.marker([ll.lat, ll.lng], { icon: wreck, interactive: false }).addTo(map);
+  // Remove FAC marker
+  if (fac.marker) map.removeLayer(fac.marker);
+  // Engagement banner
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#ff8844;padding:8px 18px;border:1px solid #ff884488;border-left:4px solid #ff8844;z-index:600;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+  banner.innerHTML = `<span style="color:#ff8844">⚔ ${fac.name} NEUTRALIZED</span> · DDG engaged with naval gunfire / ESSM`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.style.opacity = '0', 2200);
+  setTimeout(() => banner.remove(), 2900);
+};
+
 // ── Painted-route execution: tanker + 2 escort DDGs follow the painted path ──
 // Accepts opts.path to override (caller can pass a default route if no painted path exists)
 LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
@@ -1979,26 +2022,43 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
   const tanker = this._units.find(u => u.id === 'tanker1');
   const ddgL   = this._units.find(u => u.id === 'ddg102');
   const ddgR   = this._units.find(u => u.id === 'ddg119');
+  const cruiser= this._units.find(u => u.id === 'cg62');
+  const carrier= this._units.find(u => u.id === 'cvn76');
   if (!tanker || !ddgL || !ddgR) { this._routeRunning = false; return; }
 
-  const offsetDeg = 0.18; // ~20km lateral spacing — visibly separated at low zoom
+  const offsetDeg = 0.40; // ~44km lateral spacing — visibly separated at zoom 7-8
 
-  // Compute initial bearing from first segment to position escorts properly behind tanker
+  // Diamond formation, no overlapping units:
+  //          ddgL (port fwd, -20km perp, -11km astern)
+  //                                ╲
+  //   carrier (center deep aft     ╲   TANKER (lead, 0,0)
+  //          0 perp, -45km astern)  ╲
+  //                                ╱
+  //          cruiser (stbd aft, +12km perp, -28km astern)
+  //                                ╲
+  //          ddgR (stbd fwd, +20km perp, -11km astern)
   const seg0 = [path[1][0] - path[0][0], path[1][1] - path[0][1]];
   const seg0mag = Math.hypot(seg0[0], seg0[1]) || 1;
-  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;
+  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;        // ±20km lateral (DDGs)
   const perp0Lng =  seg0[0] / seg0mag * offsetDeg;
-  // Trail behind tanker by 10km, port and starboard
-  const trailLat = -seg0[0] / seg0mag * 0.10;
-  const trailLng = -seg0[1] / seg0mag * 0.10;
+  const perpHalfLat = -seg0[1] / seg0mag * 0.25;           // ±28km lateral (cruiser)
+  const perpHalfLng =  seg0[0] / seg0mag * 0.25;
+  const trailLat = -seg0[0] / seg0mag * 0.20;              // -22km astern (DDGs)
+  const trailLng = -seg0[1] / seg0mag * 0.20;
+  const aftLat   = -seg0[0] / seg0mag * 0.45;              // -50km astern (cruiser)
+  const aftLng   = -seg0[1] / seg0mag * 0.45;
+  const deepLat  = -seg0[0] / seg0mag * 0.70;              // -78km astern (carrier)
+  const deepLng  = -seg0[1] / seg0mag * 0.70;
   const start = path[0];
-  if (tanker.marker) tanker.marker.setLatLng(start);
-  if (ddgL.marker)   ddgL.marker.setLatLng([start[0] - perp0Lat + trailLat, start[1] - perp0Lng + trailLng]);
-  if (ddgR.marker)   ddgR.marker.setLatLng([start[0] + perp0Lat + trailLat, start[1] + perp0Lng + trailLng]);
+  if (tanker.marker)  tanker.marker.setLatLng(start);
+  if (ddgL.marker)    ddgL.marker.setLatLng([start[0] - perp0Lat + trailLat, start[1] - perp0Lng + trailLng]);
+  if (ddgR.marker)    ddgR.marker.setLatLng([start[0] + perp0Lat + trailLat, start[1] + perp0Lng + trailLng]);
+  if (cruiser && cruiser.marker) cruiser.marker.setLatLng([start[0] + perpHalfLat + aftLat, start[1] + perpHalfLng + aftLng]);
+  if (carrier && carrier.marker) carrier.marker.setLatLng([start[0] + deepLat, start[1] + deepLng]);
 
   // Fit map to the entire route so everything is visible from the start
   const bounds = L.latLngBounds(path);
-  this._map.fitBounds(bounds, { padding: [60, 60], maxZoom: 8 });
+  this._map.fitBounds(bounds, { padding: [80, 80], maxZoom: 7 });
   await _sleep(1000);
 
   // Draw the planned route line in cyan + a moving trail behind tanker in green
@@ -2024,21 +2084,56 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
     const perpLat = -dLng / mag * offsetDeg;
     const perpLng =  dLat / mag * offsetDeg;
     // Trail offset (escorts ride 10km astern of the tanker)
-    const trailLatSeg = -dLat / mag * 0.10;
-    const trailLngSeg = -dLng / mag * 0.10;
-    // Heading in degrees (0 = north, 90 = east). +45° calibration to match ship-icon orientation
-    const headingDeg = ((Math.atan2(dLng, dLat) * 180 / Math.PI) + 360 + 45) % 360;
-    if (tanker.marker) tanker.marker.setIcon(makeIcon(tanker.type, 'blue', false, headingDeg));
-    if (ddgL.marker)   ddgL.marker.setIcon(makeIcon(ddgL.type,   'blue', false, headingDeg));
-    if (ddgR.marker)   ddgR.marker.setIcon(makeIcon(ddgR.type,   'blue', false, headingDeg));
-    const STEPS = 35;
+    const trailLatSeg = -dLat / mag * 0.20;
+    const trailLngSeg = -dLng / mag * 0.20;
+    // Ship SVGs are drawn with bow pointing EAST (x=+30 hull tip). Navigation bearing
+    // is from north. So CSS-rotate by (bearing - 90) to align bow with direction of travel.
+    const headingDeg = ((Math.atan2(dLng, dLat) * 180 / Math.PI) - 90 + 720) % 360;
+    if (tanker.marker)              tanker.marker.setIcon(makeIcon(tanker.type, 'blue', false, headingDeg));
+    if (ddgL.marker)                ddgL.marker.setIcon(makeIcon(ddgL.type,    'blue', false, headingDeg));
+    if (ddgR.marker)                ddgR.marker.setIcon(makeIcon(ddgR.type,    'blue', false, headingDeg));
+    if (cruiser && cruiser.marker)  cruiser.marker.setIcon(makeIcon(cruiser.type,'blue', false, headingDeg));
+    if (carrier && carrier.marker)  carrier.marker.setIcon(makeIcon(carrier.type,'blue', false, headingDeg));
+    const STEPS = 10;
     for (let s = 1; s <= STEPS; s++) {
       const t = s / STEPS;
       const lat = from[0] + dLat * t;
       const lng = from[1] + dLng * t;
-      if (tanker.marker) tanker.marker.setLatLng([lat, lng]);
-      if (ddgL.marker)   ddgL.marker.setLatLng([lat - perpLat + trailLatSeg, lng - perpLng + trailLngSeg]);
-      if (ddgR.marker)   ddgR.marker.setLatLng([lat + perpLat + trailLatSeg, lng + perpLng + trailLngSeg]);
+      // Per-segment offsets — match diamond formation from initial layout
+      const perpHalfLatSeg = -dLng / mag * 0.25;        // ±28km lateral (cruiser)
+      const perpHalfLngSeg =  dLat / mag * 0.25;
+      const aftLatSeg  = -dLat / mag * 0.45;            // -50km astern (cruiser)
+      const aftLngSeg  = -dLng / mag * 0.45;
+      const deepLatSeg = -dLat / mag * 0.70;            // -78km astern (carrier)
+      const deepLngSeg = -dLng / mag * 0.70;
+      if (tanker.marker)              tanker.marker.setLatLng([lat, lng]);
+      if (ddgL.marker)                ddgL.marker.setLatLng([lat - perpLat + trailLatSeg, lng - perpLng + trailLngSeg]);
+      if (ddgR.marker)                ddgR.marker.setLatLng([lat + perpLat + trailLatSeg, lng + perpLng + trailLngSeg]);
+      if (cruiser && cruiser.marker)  cruiser.marker.setLatLng([lat + perpHalfLatSeg + aftLatSeg, lng + perpHalfLngSeg + aftLngSeg]);
+      if (carrier && carrier.marker)  carrier.marker.setLatLng([lat + deepLatSeg, lng + deepLngSeg]);
+
+      // ── Mine sweep + FAC engagement: destroyers kill mines (≤5km) and IRGC FACs (≤15km)
+      const ddgPositions = [ddgL, ddgR].filter(d => d && d.marker).map(d => d.marker.getLatLng());
+      // Sweep mines
+      if (window._activeMines && window._activeMines.length > 0) {
+        for (let mi = window._activeMines.length - 1; mi >= 0; mi--) {
+          const mine = window._activeMines[mi];
+          const closest = Math.min(...ddgPositions.map(p => haversineKm([p.lat, p.lng], [mine.lat, mine.lng])));
+          if (closest <= 5) {
+            this._sweepMine(mine);
+            window._activeMines.splice(mi, 1);
+          }
+        }
+      }
+      // Engage FACs
+      const facs = this._units.filter(u => !u.destroyed && u.side === 'red' && u.type === 'fac' && u.marker);
+      for (const fac of facs) {
+        const fll = fac.marker.getLatLng();
+        const closest = Math.min(...ddgPositions.map(p => haversineKm([p.lat, p.lng], [fll.lat, fll.lng])));
+        if (closest <= 15) {
+          this._engageFac(fac);
+        }
+      }
 
       // Append to green trail (every 3rd step to keep it light)
       if (s % 3 === 0) { trailPts.push([lat, lng]); trail.setLatLngs(trailPts); }
@@ -2049,9 +2144,22 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
         const d = haversineKm([lat, lng], [inc.lat, inc.lng]);
         if (d <= PROX_KM) {
           triggered.add(inc.id);
+          // Bump exercise indicators for live demo feel — proximity to a historical
+          // mine/attack point should spike war-risk and twitch escalation
+          if (window.activeExercise && !window.activeExercise.complete) {
+            const delta = inc.type === 'MINE' ? { warRiskInsurance:+25, escalationRung:+1 }
+                       : inc.type === 'LIMPET' ? { warRiskInsurance:+20, oilPrice:+2 }
+                       : inc.type === 'SEIZURE' ? { warRiskInsurance:+10, iranCoercion:+2 }
+                       : { warRiskInsurance:+12 };
+            if (typeof window.activeExercise.applyDelta === 'function') {
+              window.activeExercise.applyDelta(delta);
+            }
+            if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+            if (typeof window.renderIndicators === 'function') window.renderIndicators();
+          }
           // Reuse the banner from historical-incidents.js if available
           const banner = document.createElement('div');
-          banner.style.cssText = `position:fixed;top:90px;left:50%;transform:translateX(-50%);background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ${inc.color};border-left:5px solid ${inc.color};z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
+          banner.style.cssText = `position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ${inc.color};border-left:5px solid ${inc.color};z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
           banner.innerHTML = `<div style="color:${inc.color};font-size:10px;letter-spacing:2px;margin-bottom:2px">⚠ ESCORT-ROUTE PROXIMITY — ${inc.type} · ${d.toFixed(0)} KM</div>
             <div style="color:#fff;font-weight:bold;margin-bottom:4px">${inc.name} · ${inc.date}</div>
             <div style="color:#ccddee;line-height:1.5">${inc.desc}</div>`;
@@ -2067,7 +2175,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
           }, 90);
         }
       }
-      await _sleep(55);
+      await _sleep(18);
     }
   }
   this._routeRunning = false;
