@@ -107,7 +107,7 @@
     .panel-tab { flex: 1; padding: 8px 4px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--dim); font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; cursor: pointer; transition: all 0.15s; }
     .panel-tab:hover { color: var(--text); }
     .panel-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
-    #panel-wargame { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+    #panel-exercise { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
     #panel-chat { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; padding: 0; }
     #panel-chat.visible { display: flex; }
     #panel-markets { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
@@ -570,6 +570,7 @@
 
     /* Tour launch button (top bar) */
     #btn-tour {
+      display: none; /* Hidden during active demo work — was overlapping the paint toolbar. Set display:flex to re-enable. */
       position: fixed; top: 12px; right: 360px; z-index: 30;
       background: rgba(6,12,24,0.95); border: 1px solid #ffdd44; color: #ffdd44;
       font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
@@ -586,6 +587,20 @@
     .vlm-popup .leaflet-popup-tip { background:#aa66ff !important; }
     .vlm-popup .leaflet-popup-close-button { color:#aa66ff !important; }
     @keyframes spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes keyVesselPulse {
+      0%, 100% { filter: drop-shadow(0 0 3px #ff8800); }
+      50%      { filter: drop-shadow(0 0 14px #ff8800) drop-shadow(0 0 6px #ffaa00); }
+    }
+    .key-vessel-pulse { animation: keyVesselPulse 1.6s ease-in-out infinite; }
+    .damaged-hulk    { filter: grayscale(1) brightness(0.45); }
+    .disabled-ship   { filter: hue-rotate(180deg) brightness(0.7); }
+    .boarded-flash   { animation: boardedFlash 0.6s 4 ease-in-out; }
+    @keyframes boardedFlash { 0%,100% { filter: none; } 50% { filter: drop-shadow(0 0 14px #ff0000); } }
+    @keyframes fxBoom {
+      0%   { transform: scale(0.4); opacity: 0; }
+      30%  { transform: scale(1.4); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: var(--border); }
 
     /* ── STRATEGIC SITUATION PANEL ────────────────────────────── */
@@ -640,6 +655,8 @@
     body.present #panel          { width: 420px; }
     body.present #map            { width: calc(100% - 420px); }
     body.present #action-bar     { width: calc(100% - 420px); }
+    body.present #exercise-overlay { right: 420px; }
+    #exercise-overlay { right: 340px; }
     body.present #panel-header h1 { font-size: 30px; }
     body.present .subtitle       { font-size: 14px; }
     body.present #turn-num       { font-size: 24px; }
@@ -763,15 +780,13 @@
 </div>
 <div id="transit-log-panel"></div>
 
-<div id="action-bar" class="hidden">
+<div id="action-bar">
   <div id="action-bar-label">ACTIONS</div>
   <button class="action-btn blue"   id="act-move">       <span class="btn-icon">↗</span><span class="btn-label">MOVE</span>       <span class="btn-cost">click water</span></button>
-  <button class="action-btn yellow" id="act-air-cover" style="display:none">  <span class="btn-icon">✈</span><span class="btn-label">AIR COVER</span>   <span class="btn-cost">2 turns</span></button>
-  <button class="action-btn cyan"   id="act-ciws"      style="display:none">  <span class="btn-icon">⚡</span><span class="btn-label">CIWS</span>        <span class="btn-cost">1 turn</span></button>
-  <button class="action-btn purple" id="act-ew-jam"    style="display:none">  <span class="btn-icon">📡</span><span class="btn-label">EW JAMMING</span> <span class="btn-cost">2 turns</span></button>
-  <button class="action-btn green"  id="act-mine-sweep"style="display:none">  <span class="btn-icon">🔻</span><span class="btn-label">SWEEP MINES</span><span class="btn-cost">10nm</span></button>
-  <button class="action-btn yellow" id="act-airstrike" style="display:none">  <span class="btn-icon">🎯</span><span class="btn-label">AIR STRIKE</span> <span class="btn-cost">click target</span></button>
-  <button class="action-btn purple" id="act-sigint"    style="display:none">  <span class="btn-icon">📻</span><span class="btn-label">KILL RADAR</span> <span class="btn-cost">disables battery</span></button>
+  <button class="action-btn yellow" id="btn-hist-toggle"><span class="btn-icon">⚠</span><span class="btn-label">MINE / ATTACK<br>HISTORY</span><span class="btn-cost">show on map</span></button>
+  <button class="action-btn cyan"   id="btn-sim-transit"><span class="btn-icon">⏃</span><span class="btn-label">SIMULATE<br>BLUE TRANSIT</span><span class="btn-cost">DDG west-bound</span></button>
+  <button class="action-btn green"  id="btn-exec-route"><span class="btn-icon">▶</span><span class="btn-label">EXECUTE<br>PAINTED ROUTE</span><span class="btn-cost">tanker + 2 escorts</span></button>
+  <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
   <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
   <div id="dpad">
     <div id="dpad-row">
@@ -796,63 +811,56 @@
 <div id="panel">
   <div id="panel-header"><h1>STRAIT OF CONSEQUENCES</h1><div class="subtitle">AI WARGAME // STRAIT OF HORMUZ // 2026</div></div>
   <div id="panel-tabs">
-    <button class="panel-tab active" id="tab-wargame">⚔ WARGAME</button>
+    <button class="panel-tab active" id="tab-exercise">⚠ EXERCISE</button>
     <button class="panel-tab" id="tab-chat">💬 INTEL CHAT</button>
     <button class="panel-tab" id="tab-markets">📈 MARKETS</button>
   </div>
-  <div id="panel-wargame">
-  <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
-  <div id="strategic-section">
-    <div id="econ-bar">
-      <div class="econ-item">
-        <span class="econ-label">OIL AT RISK</span>
-        <span class="econ-value" id="econ-oil">21%</span>
-        <span class="econ-sub" id="econ-bpd">18.5M BPD</span>
+  <div id="panel-exercise">
+  <!-- Hidden legacy wargame DOM — kept so existing JS handlers don't crash on null. Will be removed once those references are stripped. -->
+  <div id="legacy-wargame-ui" style="display:none">
+    <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
+    <div id="strategic-section">
+      <div id="econ-bar">
+        <div class="econ-item"><span class="econ-label">OIL AT RISK</span><span class="econ-value" id="econ-oil">21%</span><span class="econ-sub" id="econ-bpd">18.5M BPD</span></div>
+        <div class="econ-item"><span class="econ-label">WAR RISK INS.</span><span class="econ-value" id="econ-insurance">SUSPENDED</span><span class="econ-sub">LLOYD'S APR 18</span></div>
+        <div class="econ-item"><span class="econ-label">IRAN CLOSURE</span><span class="econ-value" id="econ-closure">CLOSED</span><span class="econ-sub">ENFORCED APR 18</span></div>
       </div>
-      <div class="econ-item">
-        <span class="econ-label">WAR RISK INS.</span>
-        <span class="econ-value" id="econ-insurance">SUSPENDED</span>
-        <span class="econ-sub">LLOYD'S APR 18</span>
+      <div id="escalation-ladder">
+        <div id="ladder-header">ESCALATION LADDER</div>
+        <div id="ladder-rungs">
+          <div class="rung current" data-lvl="0">HARASS</div><div class="rung" data-lvl="1">SEIZURE</div><div class="rung" data-lvl="2">MINING</div><div class="rung" data-lvl="3">STRIKE</div><div class="rung" data-lvl="4">CLOSURE</div><div class="rung war" data-lvl="5">WAR</div>
+        </div>
       </div>
-      <div class="econ-item">
-        <span class="econ-label">IRAN CLOSURE</span>
-        <span class="econ-value" id="econ-closure">CLOSED</span>
-        <span class="econ-sub">ENFORCED APR 18</span>
-      </div>
-    </div>
-    <div id="escalation-ladder">
-      <div id="ladder-header">ESCALATION LADDER</div>
-      <div id="ladder-rungs">
-        <div class="rung current" data-lvl="0">HARASS</div>
-        <div class="rung" data-lvl="1">SEIZURE</div>
-        <div class="rung" data-lvl="2">MINING</div>
-        <div class="rung" data-lvl="3">STRIKE</div>
-        <div class="rung" data-lvl="4">CLOSURE</div>
-        <div class="rung war" data-lvl="5">WAR</div>
+      <div id="coalition-bar">
+        <span id="coalition-label">COALITION</span>
+        <span class="cflag" id="cf-uk" title="UK">🇬🇧</span><span class="cflag" id="cf-fr" title="France">🇫🇷</span><span class="cflag" id="cf-sa" title="Saudi">🇸🇦</span><span class="cflag" id="cf-un" title="UN">🇺🇳</span><span class="cflag hostile" id="cf-cn" title="China">🇨🇳</span>
       </div>
     </div>
-    <div id="coalition-bar">
-      <span id="coalition-label">COALITION</span>
-      <span class="cflag" id="cf-uk"  title="UK Royal Navy escorts activated">🇬🇧</span>
-      <span class="cflag" id="cf-fr"  title="France Marine Nationale deploys">🇫🇷</span>
-      <span class="cflag" id="cf-sa"  title="Saudi Arabia pipeline bypass active">🇸🇦</span>
-      <span class="cflag" id="cf-un"  title="UN Security Council emergency session">🇺🇳</span>
-      <span class="cflag hostile" id="cf-cn" title="China demands unimpeded passage">🇨🇳</span>
+    <div id="scenario-section"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
+    <div id="unit-info"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
+    <div id="ai-log"><div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Legacy log.</div></div></div>
+    <div id="controls">
+      <button class="ctrl" id="btn-demo">▶▶ DEMO</button>
+      <div id="demo-progress"></div>
+      <button class="ctrl" id="btn-end-turn">▶ END TURN</button>
+      <button class="ctrl" id="btn-new-scenario">↺ NEW SCENARIO</button>
     </div>
   </div>
-  <div id="scenario-section"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
-  <div id="unit-info"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
-  <div id="ai-log">
-    <div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Click a blue unit to select it, then click anywhere on the water to move it. Hit END TURN to trigger AI adjudication and IRGC response.</div></div>
+  <div id="exercise-tab-body" style="padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1">
+    <div id="exercise-scenario-list">
+      <div style="color:#ff6600;font-size:11px;letter-spacing:2px;margin-bottom:8px">// SELECT SCENARIO //</div>
+      <div id="scenario-cards"></div>
+    </div>
+    <div id="exercise-active" style="display:none">
+      <div id="exercise-brief" style="font-size:12px;line-height:1.5;color:#cce0ff;margin-bottom:10px"></div>
+      <div id="exercise-key-vessels"></div>
+      <div id="exercise-decisions"></div>
+      <button id="exercise-end-btn" style="margin-top:auto;padding:8px;background:rgba(255,80,80,0.1);color:#ff8888;border:1px solid #ff666633;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:2px">END EXERCISE</button>
+    </div>
   </div>
-  <div id="controls">
-    <button class="ctrl" id="btn-demo">▶▶ DEMO — WATCH FULL OPERATION</button>
-    <div id="demo-progress"></div>
-    <button class="ctrl" id="btn-end-turn">▶ END TURN / COMMIT MOVES</button>
-    <button class="ctrl" id="btn-new-scenario">↺ GENERATE NEW SCENARIO</button>
-  </div>
-  </div><!-- end #panel-wargame -->
+  </div><!-- end #panel-exercise -->
   <div id="panel-markets">
+    <div id="exercise-indicators-strip" style="display:none;border:1px solid #ff660066;padding:10px 12px;background:rgba(255,80,0,0.05);margin-bottom:10px"></div>
     <div class="strait-status-bar">
       <div class="strait-status-label">STRAIT OF HORMUZ — CURRENT STATUS</div>
       <div class="strait-status-val">⛔ EFFECTIVELY CLOSED — DUAL NAVAL BLOCKADE ACTIVE</div>
@@ -935,13 +943,15 @@
   </div>
 </div>
 
-<div id="map-dpad">
-  <button class="mdp" id="mdp-u">▲</button>
-  <button class="mdp" id="mdp-l">◀</button>
-  <button class="mdp" id="mdp-r">▶</button>
-  <button class="mdp" id="mdp-d">▼</button>
+
+<!-- Ship taxonomy side-panel (slides in on expand-arrow click) -->
+<div id="ship-cat-sidebar" style="display:none;position:fixed;top:80px;left:20px;width:360px;max-height:calc(100vh - 220px);overflow-y:auto;z-index:60;background:rgba(8,16,28,0.97);border:1px solid #ff660066;backdrop-filter:blur(6px);font-family:'Courier New',monospace;color:#cce0ff;padding:14px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.6)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div id="ship-cat-sidebar-title" style="color:#ff8800;font-size:11px;letter-spacing:2px">// STRIKE CONSEQUENCES //</div>
+    <button id="ship-cat-sidebar-close" style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;font-family:inherit;padding:2px 8px">✕</button>
+  </div>
+  <div id="ship-cat-sidebar-body" style="font-size:12px;line-height:1.6"></div>
 </div>
-<div id="map-dpad-label">STEER SHIP</div>
 
 <div id="loading">⬛ AI PROCESSING...</div>
 
@@ -961,6 +971,19 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=66"></script>
+<script src="src/historical-incidents.js?v=98"></script>
+<script src="src/ship-taxonomy.js?v=98"></script>
+<script src="src/scenarios.js?v=98"></script>
+<script src="src/exercise.js?v=98"></script>
+<script src="src/exercise-ui.js?v=98"></script>
+<script type="module" src="src/main.js?v=98"></script>
+<div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
+  <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
+    <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>
+    <span id="exercise-overlay-turn" style="font-size:11px;letter-spacing:2px">TURN 1 OF 4</span>
+    <button id="exercise-overlay-min" style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;padding:2px 8px;font-family:inherit">▾</button>
+  </div>
+  <div id="exercise-overlay-body" style="padding:10px 14px;font-size:12px"></div>
+</div>
 </body>
 </html>

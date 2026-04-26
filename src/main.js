@@ -5,6 +5,7 @@ import * as Tour       from './demo-narrative.js';
 const API = 'http://localhost:8000';
 
 const game = new LeafletGame('map');
+window.game = game;
 const ui   = new UI();
 
 // ── Strategic situation display ───────────────────────────────────────────────
@@ -182,12 +183,6 @@ game.on('civilianStrike', civ => {
   setTimeout(() => overlay.remove(), 3500);
 });
 
-// ── Action buttons ────────────────────────────────────────────────────────────
-
-['air-cover', 'ciws', 'ew-jam', 'mine-sweep', 'airstrike', 'sigint'].forEach(slug => {
-  document.getElementById(`act-${slug}`)
-    ?.addEventListener('click', () => game.triggerAction(slug.replace(/-/g, '_')));
-});
 
 const DPAD_KEYS = { 'dp-up':'ArrowUp', 'dp-down':'ArrowDown', 'dp-left':'ArrowLeft', 'dp-right':'ArrowRight' };
 Object.entries(DPAD_KEYS).forEach(([btnId, key]) => {
@@ -321,6 +316,7 @@ const _aisVessels = new Map(); // mmsi → { marker, label, lat, lng }
 const SIM_VESSELS = [
   // ── Eastbound (outbound, heading SE toward Gulf of Oman) ──
   { mmsi: 477001234, name: 'ALPINE CONFIDENCE', flag: '🇭🇰', type: 80, lat: 26.34, lng: 56.22, cog: 112, sog: 12.4,
+    actorCategory: 4,
     cargo: 'Saudi crude · 2.1M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ningbo, China',
     interests: [
       { c:'🇨🇳 China',        s: 96, r: 'Primary buyer — 2.1M bbl Aramco crude' },
@@ -330,6 +326,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 44, r: 'Ally stability, oil price floor' },
     ]},
   { mmsi: 564123456, name: 'OLYMPIC SPIRIT',    flag: '🇸🇬', type: 70, lat: 25.85, lng: 57.10, cog: 118, sog: 11.2,
+    actorCategory: 13,
     cargo: 'Container goods · 8,200 TEU', origin: 'Jebel Ali, UAE', dest: 'Singapore / Tanjung Pelepas',
     interests: [
       { c:'🇸🇬 Singapore',    s: 88, r: 'Transshipment hub — direct port call' },
@@ -339,6 +336,7 @@ const SIM_VESSELS = [
       { c:'🇪🇺 EU',           s: 48, r: 'European branded goods in transit' },
     ]},
   { mmsi: 636091234, name: 'STENA SUEDE',       flag: '🇱🇷', type: 80, lat: 25.80, lng: 56.88, cog: 122, sog: 10.8,
+    actorCategory: 7,
     cargo: 'Iraqi crude · 1.8M bbl', origin: 'Basra, Iraq', dest: 'Rotterdam, Netherlands',
     interests: [
       { c:'🇪🇺 EU',           s: 92, r: 'Critical crude supply to European refineries' },
@@ -348,6 +346,7 @@ const SIM_VESSELS = [
       { c:'🇳🇱 Netherlands',  s: 70, r: 'Rotterdam — primary EU crude landing hub' },
     ]},
   { mmsi: 229045678, name: 'MAERSK HONAM',      flag: '🇲🇹', type: 70, lat: 24.72, lng: 58.52, cog: 128, sog: 13.1,
+    actorCategory: 13,
     cargo: 'Mixed container · 15,200 TEU', origin: 'Mumbai / Nhava Sheva, India', dest: 'Hamburg, Germany',
     interests: [
       { c:'🇩🇪 Germany',      s: 80, r: 'Major importer of Indian manufactured goods' },
@@ -357,6 +356,7 @@ const SIM_VESSELS = [
       { c:'🇬🇧 UK',           s: 52, r: 'Portion of cargo destined for Felixstowe' },
     ]},
   { mmsi: 311023456, name: 'BAHRI JEDDAH',      flag: '🇧🇸', type: 80, lat: 26.08, lng: 55.68, cog: 108, sog: 11.5,
+    actorCategory: 4,
     cargo: 'Saudi Aramco crude · 2.3M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ulsan, South Korea',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 96, r: 'State-owned Bahri tanker — Aramco export' },
@@ -366,6 +366,7 @@ const SIM_VESSELS = [
       { c:'🇨🇳 China',        s: 45, r: 'Indirect — competing for same crude sources' },
     ]},
   { mmsi: 477234567, name: 'NISSOS KEROS',      flag: '🇭🇰', type: 80, lat: 25.62, lng: 58.10, cog: 115, sog: 10.1,
+    actorCategory: 7,
     cargo: 'Kuwait crude · 1.9M bbl', origin: 'Ahmadi, Kuwait', dest: 'Chiba, Japan',
     interests: [
       { c:'🇯🇵 Japan',        s: 95, r: 'Primary buyer — Tokyo Electric/JXTG supply' },
@@ -376,6 +377,7 @@ const SIM_VESSELS = [
     ]},
   // ── Westbound (inbound, heading NW into Persian Gulf) ──
   { mmsi: 538034567, name: 'PACIFIC LAGOON',    flag: '🇲🇭', type: 70, lat: 25.52, lng: 57.78, cog: 292, sog: 12.0,
+    actorCategory: 13,
     cargo: 'Auto parts / machinery · 9,000 TEU', origin: 'Colombo, Sri Lanka', dest: 'Jebel Ali, UAE',
     interests: [
       { c:'🇦🇪 UAE',          s: 85, r: 'Jebel Ali — primary ME distribution hub' },
@@ -385,6 +387,7 @@ const SIM_VESSELS = [
       { c:'🇯🇵 Japan',        s: 50, r: 'Toyota/Nissan parts supply to ME plants' },
     ]},
   { mmsi: 477056789, name: 'EURONAV VENUS',     flag: '🇧🇪', type: 80, lat: 25.92, lng: 56.48, cog: 284, sog:  9.8,
+    actorCategory: 5,
     cargo: 'Ballast (loading at Ruwais, UAE)', origin: 'Antwerp, Belgium', dest: 'Ruwais, UAE',
     interests: [
       { c:'🇦🇪 UAE',          s: 90, r: 'ADNOC crude export — ship heading to load' },
@@ -394,6 +397,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 48, r: 'US ally — corridor freedom of navigation' },
     ]},
   { mmsi: 371098765, name: 'GULF TRADER',       flag: '🇵🇦', type: 80, lat: 26.05, lng: 55.42, cog: 278, sog: 10.3,
+    actorCategory: 6,
     cargo: 'Qatar LNG condensate · 70,000 MT', origin: 'Yokohama, Japan', dest: 'Ras Laffan, Qatar',
     interests: [
       { c:'🇶🇦 Qatar',        s: 92, r: 'QatarEnergy export earnings — LNG shipment return' },
@@ -403,6 +407,7 @@ const SIM_VESSELS = [
       { c:'🇬🇧 UK',           s: 52, r: 'Centrica / Shell LNG offtake agreements' },
     ]},
   { mmsi: 636056789, name: 'MSC SARAH',         flag: '🇱🇷', type: 70, lat: 24.22, lng: 59.08, cog: 288, sog: 14.2,
+    actorCategory: 14,
     cargo: 'Consumer goods / food · 12,400 TEU', origin: 'Karachi, Pakistan', dest: 'Gioia Tauro, Italy',
     interests: [
       { c:'🇮🇹 Italy',        s: 80, r: 'Gioia Tauro hub — primary EU landing' },
@@ -412,6 +417,7 @@ const SIM_VESSELS = [
       { c:'🇬🇷 Greece',       s: 48, r: 'Transshipment calls at Piraeus' },
     ]},
   { mmsi: 229087654, name: 'NAVIGATOR AURORA',  flag: '🇬🇷', type: 80, lat: 25.32, lng: 58.18, cog: 298, sog: 11.7,
+    actorCategory: 4,
     cargo: 'Saudi LPG · 70,000 MT', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 88, r: 'Saudi Aramco LPG export — vessel returning to load' },
@@ -421,6 +427,7 @@ const SIM_VESSELS = [
       { c:'🇨🇳 China',        s: 58, r: 'Growing LPG import demand from Arabia' },
     ]},
   { mmsi: 338901234, name: 'FURE NORD',         flag: '🇳🇴', type: 80, lat: 26.20, lng: 54.90, cog: 270, sog:  8.9,
+    actorCategory: 11,
     cargo: 'Methanol · 32,000 MT', origin: 'Rotterdam, Netherlands', dest: 'Jubail, Saudi Arabia',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 86, r: 'SABIC industrial feedstock import' },
@@ -431,6 +438,7 @@ const SIM_VESSELS = [
     ]},
   // ── Slow / anchored near Fujairah / Khor Fakkan ──
   { mmsi: 303012345, name: 'DELTA NAVIGATOR',   flag: '🇺🇸', type: 70, lat: 25.11, lng: 56.38, cog: 180, sog:  0.3,
+    actorCategory: 3,
     cargo: 'US Military logistics · classified', origin: 'Norfolk, VA (via Suez)', dest: 'Diego Garcia / 5th Fleet',
     interests: [
       { c:'🇺🇸 USA',          s: 98, r: 'US Navy / TRANSCOM logistics — mission critical' },
@@ -440,6 +448,7 @@ const SIM_VESSELS = [
       { c:'🇮🇳 India',        s: 40, r: 'Quad partner — indirect security interest' },
     ]},
   { mmsi: 538090123, name: 'OCEAN TRIUMPH',     flag: '🇲🇭', type: 80, lat: 25.07, lng: 57.12, cog:   0, sog:  0.1,
+    actorCategory: 8,
     cargo: 'Omani crude · 2.2M bbl (anchored, awaiting clearance)', origin: 'Mina al Fahal, Oman', dest: 'Zhoushan, China',
     interests: [
       { c:'🇨🇳 China',        s: 96, r: 'Buyer — Zhoushan SPR fill, refinery feed' },
@@ -449,6 +458,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 30, r: 'Monitoring Chinese energy imports' },
     ]},
   { mmsi: 413012345, name: 'HONG FA',           flag: '🇨🇳', type: 70, lat: 24.95, lng: 57.45, cog:  45, sog:  1.2,
+    actorCategory: 8,
     cargo: 'Chinese manufactured goods · 10,800 TEU', origin: 'Tianjin, China', dest: 'Jebel Ali, UAE',
     interests: [
       { c:'🇨🇳 China',        s: 94, r: 'State-flagged — BRI trade corridor exports' },
@@ -574,6 +584,88 @@ function _startAIS() {
   const map = game.map;
   if (!map) { setTimeout(_startAIS, 500); return; }
 
+  // Wire the expand-arrow on AIS popups → opens side-panel (popup is too narrow)
+  if (!map._shipExpandWired) {
+    map._shipExpandWired = true;
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest && ev.target.closest('.ship-expand-btn');
+      if (!btn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+      const catId = parseInt(btn.dataset.cat || '0', 10);
+      const mmsi = parseInt(btn.dataset.mmsi || '0', 10);
+      const cat = (typeof getCategory === 'function') ? getCategory(catId) : null;
+      const entry = _aisVessels && _aisVessels.get(mmsi);
+      const v = entry && entry.v;
+      if (!cat) return;
+      const sidebar = document.getElementById('ship-cat-sidebar');
+      const body = document.getElementById('ship-cat-sidebar-body');
+      const title = document.getElementById('ship-cat-sidebar-title');
+      if (!sidebar || !body || !title) return;
+      title.textContent = v ? `// ${v.flag} ${v.name} · STRIKE IMPACT //` : `// CAT ${cat.id} — STRIKE CONSEQUENCES //`;
+      // Build interests block (per-stakeholder loss profile from SIM_VESSEL.interests)
+      const interestsHtml = (v && v.interests && v.interests.length) ? `
+        <div style="border-left:3px solid #ffaa44;padding:8px 10px;margin-bottom:10px;background:rgba(255,170,68,0.06)">
+          <div style="color:#ffaa44;font-size:10px;letter-spacing:2px;margin-bottom:6px">WHO STANDS TO LOSE — STAKEHOLDER IMPACT</div>
+          ${v.interests.map(i => {
+            const c = i.s >= 80 ? '#ff8833' : i.s >= 60 ? '#ffdd44' : '#88ccee';
+            return `<div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
+                <span style="color:#e0e8f0;font-weight:bold">${i.c}</span>
+                <span style="color:${c};font-weight:bold">${i.s}/100</span>
+              </div>
+              <div style="background:#0d1e2a;border-radius:2px;height:6px;width:100%;margin-bottom:3px">
+                <div style="background:${c};width:${i.s}%;height:6px;border-radius:2px"></div>
+              </div>
+              <div style="font-size:10px;color:#a0b0c0;line-height:1.4">${i.r}</div>
+            </div>`;
+          }).join('')}
+        </div>` : '';
+      // Cargo + route block
+      const cargoHtml = v ? `
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid #1a3a5a">
+          <span style="color:#7a8896">CARGO</span><span style="color:#ffe080">${v.cargo || '—'}</span>
+          <span style="color:#7a8896">FROM</span><span style="color:#cce0ff">${v.origin || '—'}</span>
+          <span style="color:#7a8896">TO</span><span style="color:#cce0ff">${v.dest || '—'}</span>
+          <span style="color:#7a8896">FLAG / MMSI</span><span style="color:#cce0ff">${v.flag || ''} · ${v.mmsi || '—'}</span>
+        </div>` : '';
+      body.innerHTML = `
+        <div style="margin-bottom:10px">
+          <div style="color:#ff8800;font-size:15px;font-weight:bold;margin-bottom:2px">${v ? (v.flag + ' ' + v.name) : cat.name}</div>
+          <div style="color:#7a8896;font-size:10px">CAT ${cat.id} · ${cat.name}</div>
+        </div>
+        ${cargoHtml}
+        ${interestsHtml}
+        <details style="margin-bottom:6px">
+          <summary style="cursor:pointer;color:#aabbcc;font-size:10px;letter-spacing:2px;padding:4px 0">▸ TAXONOMY (RED CELL / BLUE CELL VIEW)</summary>
+          <div style="border-left:3px solid #ff6666;padding:6px 10px;margin:6px 0;background:rgba(255,80,80,0.06)">
+            <div style="color:#ff6666;font-size:10px;letter-spacing:2px;margin-bottom:3px">RED CELL SEES</div>
+            <div style="color:#ffcccc;font-size:11px">${cat.redCell}</div>
+          </div>
+          <div style="border-left:3px solid #6699ff;padding:6px 10px;margin:6px 0;background:rgba(80,150,255,0.06)">
+            <div style="color:#6699ff;font-size:10px;letter-spacing:2px;margin-bottom:3px">BLUE CELL SEES</div>
+            <div style="color:#ccddff;font-size:11px">${cat.blueCell}</div>
+          </div>
+          <div style="border-left:3px solid #ffaa44;padding:6px 10px;background:rgba(255,170,68,0.06)">
+            <div style="color:#ffaa44;font-size:10px;letter-spacing:2px;margin-bottom:3px">CATEGORY-LEVEL CONSEQUENCES</div>
+            <div style="color:#ffe0c0;font-size:11px">${cat.consequences}</div>
+          </div>
+        </details>`;
+      // Defer the open one frame so any in-flight close events finish first
+      requestAnimationFrame(() => { sidebar.style.display = 'block'; sidebar.dataset.openAt = String(Date.now()); });
+    }, true);
+    const closeBtn = document.getElementById('ship-cat-sidebar-close');
+    if (closeBtn) closeBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const sb = document.getElementById('ship-cat-sidebar');
+      if (!sb) return;
+      const openAt = parseInt(sb.dataset.openAt || '0', 10);
+      if (Date.now() - openAt < 250) return; // ignore stray close within 250ms of open
+      sb.style.display = 'none';
+    });
+  }
+
   SIM_VESSELS.forEach(v => {
     // Assign nav direction: inbound (COG 180–360) = heading west toward PG = navDir +1 (idx increases)
     // outbound (COG 0–180) = heading east toward GOO = navDir -1 (idx decreases)
@@ -619,6 +711,16 @@ function _startAIS() {
           <div style="font-size:9px;letter-spacing:1px;color:#4a7a9a;margin-bottom:5px">STAKEHOLDER INTEREST IN SAFE PASSAGE (0–100)</div>
           ${bars}
         </div>` : ''}
+        ${(typeof getCategory === 'function' && v.actorCategory) ? (() => {
+          const cat = getCategory(v.actorCategory);
+          if (!cat) return '';
+          return `<div style="border-top:1px solid #1a3a4a;padding-top:7px;margin-top:7px">
+            <button class="ship-expand-btn" data-mmsi="${v.mmsi}" data-cat="${cat.id}"
+              style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;font-family:'Courier New',monospace;font-size:10px;padding:4px 10px;width:100%;letter-spacing:1.5px">
+              ▶ STRIKE CONSEQUENCES — CAT ${cat.id}
+            </button>
+          </div>`;
+        })() : ''}
       </div>`;
     };
 
@@ -629,9 +731,9 @@ function _startAIS() {
   console.log(`[AIS] ${SIM_VESSELS.length} vessels on nav channel`);
   _updateTransitDisplay();
 
-  // Advance vessels along the nav channel every 15 s
+  // Advance vessels along the nav channel every 3 s (kept visible during exercises)
   setInterval(() => {
-    const DT = 15;
+    const DT = 3;
     _aisVessels.forEach(({ marker, label, v, makePopup }) => {
       const step = (v.sog / 3600) * 1.852 / 111 * DT; // degrees per tick
 
@@ -673,11 +775,157 @@ function _startAIS() {
       marker.setLatLng([v.lat, v.lng]);
       label.setLatLng([v.lat, v.lng]);
       if (marker.isPopupOpen()) marker.setPopupContent(makePopup());
+      // Re-apply exercise highlight (icon swap or update would otherwise drop CSS class / opacity)
+      if (_activeKeyCategories) _applyVesselHighlight(marker, label, v);
     });
-  }, 15_000);
+  }, 3_000);
 }
 
 _startAIS();
+
+// ── Exercise key-vessel isolation ─────────────────────────────────────────────
+let _activeKeyCategories = null;
+function _applyVesselHighlight(marker, label, v) {
+  if (!_activeKeyCategories) return;
+  const isKey = _activeKeyCategories.has(v.actorCategory);
+  marker.setOpacity(isKey ? 1.0 : 0.22);
+  if (label) label.setOpacity(isKey ? 1.0 : 0.0);
+  const el = marker.getElement && marker.getElement();
+  if (!el) return;
+  if (isKey) el.classList.add('key-vessel-pulse');
+  else       el.classList.remove('key-vessel-pulse');
+}
+function dimNonKeyVessels(keyCategories) {
+  if (!_aisVessels || _aisVessels.size === 0) return;
+  _activeKeyCategories = new Set(keyCategories || []);
+  const keyLatLngs = [];
+  _aisVessels.forEach(({ marker, label, v }) => {
+    _applyVesselHighlight(marker, label, v);
+    if (_activeKeyCategories.has(v.actorCategory)) {
+      keyLatLngs.push(marker.getLatLng());
+    }
+  });
+  if (keyLatLngs.length > 0 && game.map) {
+    const bounds = L.latLngBounds(keyLatLngs);
+    game.map.fitBounds(bounds, { padding: [70, 70], maxZoom: 9 });
+  }
+}
+
+function restoreAllVessels() {
+  _activeKeyCategories = null;
+  if (!_aisVessels) return;
+  _aisVessels.forEach(({ marker, label }) => {
+    marker.setOpacity(1.0);
+    if (label) label.setOpacity(1.0);
+    const el = marker.getElement && marker.getElement();
+    if (el) el.classList.remove('key-vessel-pulse');
+  });
+}
+
+window.dimNonKeyVessels = dimNonKeyVessels;
+window.restoreAllVessels = restoreAllVessels;
+
+function animateVesselImpact(mmsi, type) {
+  if (!_aisVessels) return;
+  const entry = _aisVessels.get(mmsi);
+  if (!entry || !entry.marker) return;
+  const marker = entry.marker;
+  const latlng = marker.getLatLng();
+  const map = game.map;
+  if (!map) return;
+  const el = marker.getElement && marker.getElement();
+
+  switch (type) {
+    case 'STRIKE': {
+      const explosion = L.divIcon({
+        className: 'fx-explosion',
+        html: '<div style="font-size:48px;animation:fxBoom 1.6s ease-out forwards;text-shadow:0 0 22px #ff3300">💥</div>',
+        iconSize: [48, 48],
+      });
+      const fx = L.marker(latlng, { icon: explosion, interactive: false, zIndexOffset: 1000 }).addTo(map);
+      setTimeout(() => map.removeLayer(fx), 2200);
+      if (el) el.classList.add('damaged-hulk');
+      break;
+    }
+    case 'DISABLED': {
+      if (el) el.classList.add('disabled-ship');
+      break;
+    }
+    case 'SINKING': {
+      if (el) el.classList.add('damaged-hulk');
+      const wreck = L.divIcon({
+        className: 'fx-wreck',
+        html: '<div style="font-size:22px;color:#444;text-shadow:0 0 4px #000">⊗</div>',
+        iconSize: [22, 22],
+      });
+      L.marker(latlng, { icon: wreck, interactive: false }).addTo(map);
+      // Fade out the marker over 3s
+      let opacity = 1;
+      const fade = setInterval(() => {
+        opacity -= 0.12;
+        marker.setOpacity(Math.max(0, opacity));
+        if (opacity <= 0) clearInterval(fade);
+      }, 250);
+      break;
+    }
+    case 'BOARDED': {
+      if (el) el.classList.add('boarded-flash');
+      break;
+    }
+    case 'MINED': {
+      const ring = L.circle(latlng, {
+        radius: 1500, color: '#ff4400', weight: 3, fillOpacity: 0.18,
+        dashArray: '4 4', interactive: false,
+      }).addTo(map);
+      // Pulse outward
+      let r = 1500;
+      const pulse = setInterval(() => {
+        r += 600;
+        ring.setRadius(r);
+        ring.setStyle({ opacity: Math.max(0, 1 - (r - 1500) / 6000) });
+        if (r >= 7500) { clearInterval(pulse); map.removeLayer(ring); }
+      }, 120);
+      if (el) el.classList.add('damaged-hulk');
+      break;
+    }
+    case 'OIL_SLICK': {
+      const slick = L.circle(latlng, {
+        radius: 5000, color: '#000', weight: 0,
+        fillColor: '#0a0610', fillOpacity: 0.55, interactive: false,
+      }).addTo(map);
+      // Persist
+      let r = 1500;
+      const grow = setInterval(() => {
+        r += 700;
+        slick.setRadius(r);
+        if (r >= 6000) clearInterval(grow);
+      }, 200);
+      break;
+    }
+    case 'CONVOY_FORM': {
+      const ring = L.circle(latlng, {
+        radius: 8000, color: '#0088ff', weight: 2,
+        dashArray: '6 4', fillOpacity: 0, interactive: false,
+      }).addTo(map);
+      setTimeout(() => map.removeLayer(ring), 4000);
+      break;
+    }
+    case 'TRANSIT_HALT': {
+      let banner = document.getElementById('transit-halt-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'transit-halt-banner';
+        banner.textContent = '⚠ STRAIT TRANSIT SUSPENDED';
+        banner.style.cssText = 'position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(160,0,0,0.85);color:#fff;padding:8px 18px;letter-spacing:3px;z-index:500;font-family:Courier New,monospace;font-weight:bold;border:1px solid #ff4444;text-shadow:0 0 8px #ff0000';
+        document.getElementById('map').appendChild(banner);
+        setTimeout(() => banner.remove(), 5000);
+      }
+      break;
+    }
+  }
+}
+
+window.animateVesselImpact = animateVesselImpact;
 
 // ── VLM Intel capture ─────────────────────────────────────────────────────────
 const OLLAMA_MODEL        = 'llama3.2-vision:11b';
@@ -814,6 +1062,56 @@ document.getElementById('intel-btn').addEventListener('click', async () => {
   _startIntelDraw(_runIntelAnalysis, '#aa66ff');
 });
 
+// Expose for exercise scenarios that want live VLM
+window._startIntelDraw    = _startIntelDraw;
+window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
+
+// Historical incidents + transit simulation buttons
+{
+  let _histShown = false;
+  const histBtn = document.getElementById('btn-hist-toggle');
+  if (histBtn) histBtn.addEventListener('click', () => {
+    _histShown = !_histShown;
+    if (_histShown) { window.renderHistoricalIncidents && window.renderHistoricalIncidents(); histBtn.style.background = 'rgba(204,170,34,0.18)'; }
+    else            { window.hideHistoricalIncidents   && window.hideHistoricalIncidents();   histBtn.style.background = 'transparent'; }
+  });
+  const simBtn = document.getElementById('btn-sim-transit');
+  if (simBtn) simBtn.addEventListener('click', () => {
+    if (window.simulateBlueTransit) window.simulateBlueTransit();
+  });
+  const execBtn = document.getElementById('btn-exec-route');
+  if (execBtn) execBtn.addEventListener('click', () => {
+    if (window.game && typeof window.game.executePaintedRoute === 'function') {
+      window.game.executePaintedRoute();
+    }
+  });
+
+  // Hide-all-ships toggle (for clean map screenshots)
+  let _shipsHidden = false;
+  const hideShipsBtn = document.getElementById('btn-hide-ships');
+  if (hideShipsBtn) hideShipsBtn.addEventListener('click', () => {
+    _shipsHidden = !_shipsHidden;
+    const op = _shipsHidden ? 0 : 1;
+    // AIS vessels + their labels
+    if (typeof _aisVessels !== 'undefined' && _aisVessels) {
+      _aisVessels.forEach(({ marker, label }) => {
+        marker.setOpacity(op);
+        if (label) label.setOpacity(op);
+      });
+    }
+    // Game units (Blue + Red)
+    if (window.game && window.game._units) {
+      window.game._units.forEach(u => { if (u.marker) u.marker.setOpacity(op); });
+    }
+    // Civilian static ships (CIVILIAN_SHIPS in leaflet-game)
+    if (window.game && window.game._civilians) {
+      window.game._civilians.forEach(c => { if (c.marker) c.marker.setOpacity(op); });
+    }
+    hideShipsBtn.style.background = _shipsHidden ? 'rgba(170,102,255,0.18)' : 'transparent';
+    hideShipsBtn.querySelector('.btn-label').innerHTML = _shipsHidden ? 'SHOW ALL<br>SHIPS' : 'HIDE ALL<br>SHIPS';
+  });
+}
+
 async function _runIntelAnalysis(sw, ne) {
   const btn   = document.getElementById('intel-btn');
   const modal = document.getElementById('intel-modal');
@@ -880,16 +1178,35 @@ async function _runIntelAnalysis(sw, ne) {
       }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
     }
 
-    // Three focused parallel questions — one type at a time for accuracy
-    const [aircraftReply, vesselReply, infraReply, posReply] = await Promise.all([
-      ollamaAskShort('Count aircraft on the ground (runways, aprons, gates). ONE line: "N aircraft: location, location" or "0 aircraft". No extra text.'),
-      ollamaAskShort('Count boats/ships floating in water. ONE line: "N vessels: location, location" or "0 vessels". If no water visible say "0 vessels". No extra text.'),
-      ollamaAskShort('Name main structures in one short phrase e.g. "harbor with two breakwaters" or "airport with runway". No lists.'),
-      ollamaAsk('For every vessel and aircraft you can see, output its position as image fractions — x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom. Plain text only, one per line:\nvessel x y\naircraft x y\nOnly list things you can actually see. No explanation.'),
-    ]);
-
+    // Four parallel questions, but render progressively as each one completes
+    const queries = [
+      { key: 'AIRCRAFT', q: 'Count aircraft on the ground (runways, aprons, gates). ONE line: "N aircraft: location, location" or "0 aircraft". No extra text.', short: true },
+      { key: 'VESSELS',  q: 'Count boats/ships floating in water. ONE line: "N vessels: location, location" or "0 vessels". If no water visible say "0 vessels". No extra text.', short: true },
+      { key: 'INFRA',    q: 'Name main structures in one short phrase e.g. "harbor with two breakwaters" or "airport with runway". No lists.', short: true },
+      { key: 'POSITIONS',q: 'For every vessel and aircraft you can see, output its position as image fractions — x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom. Plain text only, one per line:\nvessel x y\naircraft x y\nOnly list things you can actually see. No explanation.', short: false },
+    ];
+    const results = { AIRCRAFT:'⟳ querying…', VESSELS:'⟳ querying…', INFRA:'⟳ querying…', POSITIONS:'⟳ querying…' };
+    const renderProgress = () => {
+      const lines = ['AIRCRAFT: '+results.AIRCRAFT, 'VESSELS:  '+results.VESSELS, 'INFRA:    '+results.INFRA].join('\n');
+      if (streamEl) streamEl.textContent = lines;
+    };
+    renderProgress();
+    // Fire in parallel; update display each time one resolves
+    const promises = queries.map(({ key, q, short }) =>
+      (short ? ollamaAskShort(q) : ollamaAsk(q))
+        .then(r => { results[key] = (r || '').trim() || '(empty)'; renderProgress(); return r; })
+        .catch(e => { results[key] = '✖ ' + e.message; renderProgress(); return ''; })
+    );
+    const [aircraftReply, vesselReply, infraReply, posReply] = await Promise.all(promises);
     const text = `AIRCRAFT: ${aircraftReply}\nVESSELS:  ${vesselReply}\nINFRA:    ${infraReply}`;
-    if (streamEl) streamEl.textContent = text;
+    // If an exercise is active, also append the VLM result to the sitrep overlay
+    try {
+      if (window.activeExercise && window.activeExercise.sitrep && window.activeExercise.sitrep.length > 0) {
+        const last = window.activeExercise.sitrep[window.activeExercise.sitrep.length - 1];
+        last.assessment = (last.assessment || '') + `\n\n[VLM LIVE — Llama 3.2 Vision]\nAIRCRAFT: ${aircraftReply}\nVESSELS:  ${vesselReply}\nINFRA:    ${infraReply}`;
+        if (typeof window.renderActiveExercise === 'function') window.renderActiveExercise();
+      }
+    } catch (e) {}
 
     // Drop a single clickable intel flag at the center — click to read the full analysis
     _clearVlmMarkers();
@@ -1262,6 +1579,7 @@ function _renderAirportOverlay(data) {
   _airportMarkers = [];
   for (const ap of Object.values(data)) {
     if (ap.aircraft == null) continue;
+    if (ap.country !== 'IR') continue; // Red team only — Iran
     const n = ap.aircraft;
     const color = n === 0 ? '#667788' : n < 30 ? '#44cc44' : n < 80 ? '#ffcc00' : n < 150 ? '#ff8800' : '#ff3333';
     const r = n === 0 ? 10 : Math.min(28, 10 + Math.sqrt(n) * 1.4);
@@ -2138,20 +2456,20 @@ const CHAT_LLM  = 'http://localhost:11434/api/generate';
 const CHAT_MODEL = 'llama3.1:8b';
 
 function _showTab(name) {
-  ['wargame','chat','markets'].forEach(t => {
+  ['exercise','chat','markets'].forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.remove('active');
-    if (t === 'wargame') document.getElementById('panel-wargame').style.display = 'none';
+    if (t === 'exercise') document.getElementById('panel-exercise').style.display = 'none';
     else document.getElementById(`panel-${t}`)?.classList.remove('visible');
   });
   document.getElementById(`tab-${name}`)?.classList.add('active');
-  if (name === 'wargame') document.getElementById('panel-wargame').style.display = 'flex';
+  if (name === 'exercise') document.getElementById('panel-exercise').style.display = 'flex';
   else document.getElementById(`panel-${name}`)?.classList.add('visible');
   if (name === 'chat') document.getElementById('chat-input')?.focus();
 }
-document.getElementById('tab-wargame').addEventListener('click', () => _showTab('wargame'));
+document.getElementById('tab-exercise').addEventListener('click', () => _showTab('exercise'));
 document.getElementById('tab-chat').addEventListener('click',    () => _showTab('chat'));
 document.getElementById('tab-markets').addEventListener('click', () => _showTab('markets'));
-_showTab('wargame');
+_showTab('exercise');
 
 async function _chatSend() {
   const input = document.getElementById('chat-input');
@@ -2229,3 +2547,17 @@ document.getElementById('chat-send').addEventListener('click', _chatSend);
 document.getElementById('chat-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _chatSend(); }
 });
+
+// Exercise UI init
+if (typeof renderScenarioCards === 'function') {
+  renderScenarioCards();
+  const endBtn = document.getElementById('exercise-end-btn');
+  if (endBtn) endBtn.addEventListener('click', endExercise);
+  const minBtn = document.getElementById('exercise-overlay-min');
+  if (minBtn) minBtn.addEventListener('click', () => {
+    const ov = document.getElementById('exercise-overlay');
+    ov.style.maxHeight = ov.style.maxHeight === '40px' ? '280px' : '40px';
+  });
+} else {
+  console.warn('Exercise UI not loaded');
+}

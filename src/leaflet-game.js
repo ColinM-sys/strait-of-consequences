@@ -502,6 +502,15 @@ export class LeafletGame {
     mapEl.addEventListener('mousedown',  onDown);
     mapEl.addEventListener('mousemove',  onMove);
     mapEl.addEventListener('mouseup',    onUp);
+    // Expose the latest painted path on the instance so external code can use it
+    this._lastPaintedPath = null;
+    const origUp = onUp;
+    // (onUp already runs above; we just stash the result after it finishes)
+    mapEl.addEventListener('mouseup', () => {
+      if (this._paintMode === 'path' && this._paintPoints && this._paintPoints.length >= 2) {
+        this._lastPaintedPath = this._paintPoints.slice();
+      }
+    });
     mapEl.addEventListener('touchstart', onDown,  { passive: true });
     mapEl.addEventListener('touchmove',  onMove,  { passive: true });
     mapEl.addEventListener('touchend',   onUp);
@@ -1953,3 +1962,114 @@ export class LeafletGame {
 
 // ── Module-level sleep ────────────────────────────────────────────────────────
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Painted-route execution: tanker + 2 escort DDGs follow the painted path ──
+// Accepts opts.path to override (caller can pass a default route if no painted path exists)
+LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
+  const path = (opts && opts.path && opts.path.length >= 2)
+    ? opts.path
+    : ((this._lastPaintedPath && this._lastPaintedPath.length >= 2) ? this._lastPaintedPath : null);
+  if (!path) {
+    if (this._emit) this._emit('info', 'No painted path. Use the PATH paint tool first.');
+    return;
+  }
+  if (this._routeRunning) return;
+  this._routeRunning = true;
+
+  const tanker = this._units.find(u => u.id === 'tanker1');
+  const ddgL   = this._units.find(u => u.id === 'ddg102');
+  const ddgR   = this._units.find(u => u.id === 'ddg119');
+  if (!tanker || !ddgL || !ddgR) { this._routeRunning = false; return; }
+
+  const offsetDeg = 0.18; // ~20km lateral spacing — visibly separated at low zoom
+
+  // Compute initial bearing from first segment to position escorts properly behind tanker
+  const seg0 = [path[1][0] - path[0][0], path[1][1] - path[0][1]];
+  const seg0mag = Math.hypot(seg0[0], seg0[1]) || 1;
+  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;
+  const perp0Lng =  seg0[0] / seg0mag * offsetDeg;
+  // Trail behind tanker by 10km, port and starboard
+  const trailLat = -seg0[0] / seg0mag * 0.10;
+  const trailLng = -seg0[1] / seg0mag * 0.10;
+  const start = path[0];
+  if (tanker.marker) tanker.marker.setLatLng(start);
+  if (ddgL.marker)   ddgL.marker.setLatLng([start[0] - perp0Lat + trailLat, start[1] - perp0Lng + trailLng]);
+  if (ddgR.marker)   ddgR.marker.setLatLng([start[0] + perp0Lat + trailLat, start[1] + perp0Lng + trailLng]);
+
+  // Fit map to the entire route so everything is visible from the start
+  const bounds = L.latLngBounds(path);
+  this._map.fitBounds(bounds, { padding: [60, 60], maxZoom: 8 });
+  await _sleep(1000);
+
+  // Draw the planned route line in cyan + a moving trail behind tanker in green
+  const plannedLine = L.polyline(path, { color: '#88ccff', weight: 2, opacity: 0.6, dashArray: '5 6', interactive: false }).addTo(this._map);
+  const trail = L.polyline([], { color: '#44cc88', weight: 3, opacity: 0.85, interactive: false }).addTo(this._map);
+  let trailPts = [start];
+
+  const triggered = new Set();
+  const incidents = (typeof window !== 'undefined' && window.HISTORICAL_INCIDENTS) || [];
+  const haversineKm = (a, b) => {
+    const R = 6371, dLat = (b[0]-a[0])*Math.PI/180, dLng = (b[1]-a[1])*Math.PI/180;
+    const lat1 = a[0]*Math.PI/180, lat2 = b[0]*Math.PI/180;
+    const x = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+
+  // Compute escort offset perpendicular to current segment direction
+  const PROX_KM = 90;
+  for (let i = 1; i < path.length; i++) {
+    const from = path[i-1], to = path[i];
+    const dLat = to[0] - from[0], dLng = to[1] - from[1];
+    const mag = Math.hypot(dLat, dLng) || 1;
+    const perpLat = -dLng / mag * offsetDeg;
+    const perpLng =  dLat / mag * offsetDeg;
+    // Trail offset (escorts ride 10km astern of the tanker)
+    const trailLatSeg = -dLat / mag * 0.10;
+    const trailLngSeg = -dLng / mag * 0.10;
+    // Heading in degrees (0 = north, 90 = east). +45° calibration to match ship-icon orientation
+    const headingDeg = ((Math.atan2(dLng, dLat) * 180 / Math.PI) + 360 + 45) % 360;
+    if (tanker.marker) tanker.marker.setIcon(makeIcon(tanker.type, 'blue', false, headingDeg));
+    if (ddgL.marker)   ddgL.marker.setIcon(makeIcon(ddgL.type,   'blue', false, headingDeg));
+    if (ddgR.marker)   ddgR.marker.setIcon(makeIcon(ddgR.type,   'blue', false, headingDeg));
+    const STEPS = 35;
+    for (let s = 1; s <= STEPS; s++) {
+      const t = s / STEPS;
+      const lat = from[0] + dLat * t;
+      const lng = from[1] + dLng * t;
+      if (tanker.marker) tanker.marker.setLatLng([lat, lng]);
+      if (ddgL.marker)   ddgL.marker.setLatLng([lat - perpLat + trailLatSeg, lng - perpLng + trailLngSeg]);
+      if (ddgR.marker)   ddgR.marker.setLatLng([lat + perpLat + trailLatSeg, lng + perpLng + trailLngSeg]);
+
+      // Append to green trail (every 3rd step to keep it light)
+      if (s % 3 === 0) { trailPts.push([lat, lng]); trail.setLatLngs(trailPts); }
+
+      // Historical proximity alerts
+      for (const inc of incidents) {
+        if (triggered.has(inc.id)) continue;
+        const d = haversineKm([lat, lng], [inc.lat, inc.lng]);
+        if (d <= PROX_KM) {
+          triggered.add(inc.id);
+          // Reuse the banner from historical-incidents.js if available
+          const banner = document.createElement('div');
+          banner.style.cssText = `position:fixed;top:90px;left:50%;transform:translateX(-50%);background:rgba(0,8,16,0.94);color:#ffaa44;padding:10px 20px;border:1px solid ${inc.color};border-left:5px solid ${inc.color};z-index:600;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
+          banner.innerHTML = `<div style="color:${inc.color};font-size:10px;letter-spacing:2px;margin-bottom:2px">⚠ ESCORT-ROUTE PROXIMITY — ${inc.type} · ${d.toFixed(0)} KM</div>
+            <div style="color:#fff;font-weight:bold;margin-bottom:4px">${inc.name} · ${inc.date}</div>
+            <div style="color:#ccddee;line-height:1.5">${inc.desc}</div>`;
+          document.body.appendChild(banner);
+          setTimeout(() => banner.style.opacity = '0', 5500);
+          setTimeout(() => banner.remove(), 6200);
+          // Pulse the historical marker
+          const ring = L.circle([inc.lat, inc.lng], { radius: 1500, color: inc.color, weight: 4, fillOpacity: 0.18, interactive: false }).addTo(this._map);
+          let r = 1500;
+          const pulse = setInterval(() => {
+            r += 700; ring.setRadius(r); ring.setStyle({ opacity: Math.max(0, 1 - (r - 1500) / 12000) });
+            if (r >= 14000) { clearInterval(pulse); this._map.removeLayer(ring); }
+          }, 90);
+        }
+      }
+      await _sleep(55);
+    }
+  }
+  this._routeRunning = false;
+  if (this._emit) this._emit('info', `Route transit complete · ${triggered.size}/${incidents.length} historical incidents in proximity`);
+};
