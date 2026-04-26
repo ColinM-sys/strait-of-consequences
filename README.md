@@ -17,7 +17,7 @@
 - **ArcGIS World Imagery** — satellite basemap tiles (Esri)
 - **CartoDB** dark labels overlay
 - **ESA Sentinel-2** (Copernicus Data Space) — before/after satellite imagery for VLM analysis. Auth + processing proxied through `serve.py` to keep API keys off the frontend.
-- **ChromaDB RAG corpus** with 23 hand-curated unclassified docs covering Lloyd's JWC war-risk insurance, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules, and historical Tanker War / 2019 Fujairah limpet / Stena Impero precedents (seeded via `api/seed_insurance_docs.py`)
+- **ChromaDB RAG corpus** — 863 docs total: 23 hand-curated unclassified docs covering Lloyd's JWC war-risk insurance, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules, and historical Tanker War / 2019 Fujairah limpet / Stena Impero precedents (`api/seed_insurance_docs.py`) plus 840 OSM strategic-asset features ingested as searchable docs (`api/seed_osm_into_rag.py`) so INTEL CHAT can answer location queries like "where is Ras Tanura?" or "what oil terminals are in Iran?"
 - **Llama 3.1 8B** (adjudication / chat) + **Llama 3.2 Vision 11B** (satellite VLM) running locally via Ollama
 - **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) — operator-tuned overlays of base Llama 3.2 Vision
 - **Hand-curated AIS-style vessel snapshot** — 15 simulated vessels with real cargo manifests, origins, destinations, and stakeholder-interest scores reflecting April 2026 strait traffic
@@ -210,7 +210,7 @@ All 5 Blue surface units transit together with proper standoff spacing (no overl
 | CartoDB dark labels | Place name overlay |
 | ESA Sentinel-2 (Copernicus Data Space) | Before/after imagery comparison + VLM analysis (auth proxied through serve.py) |
 | OpenStreetMap / Overpass API | 840 strategic-asset features cached to `osm_infra.json` (ports, refineries, oil terminals, airports, military / naval bases, power plants) |
-| ChromaDB RAG corpus (23 docs) | Hand-curated insurance / sanctions / shadow-fleet / IMO TSS / Tanker-War-precedent docs (seeded via `api/seed_insurance_docs.py`) |
+| ChromaDB RAG corpus (863 docs) | 23 hand-curated insurance / sanctions / shadow-fleet / IMO TSS / Tanker-War docs + 840 OSM strategic-asset features ingested for chat-side location queries (`api/seed_insurance_docs.py` + `api/seed_osm_into_rag.py`) |
 | Joint Chiefs publications (JP 3-0, 5-0, 3-32) | Doctrinal reference during scenario authoring; cited in assessment text |
 | CSIS / RAND Hormuz analyses | Open-source reference during scenario authoring |
 | Hand-curated SIM_VESSELS snapshot | 15 vessels with cargo manifests, flags, MMSI, origins, destinations, stakeholder-interest scores |
