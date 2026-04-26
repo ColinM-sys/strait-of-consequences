@@ -192,7 +192,7 @@
     #coord-copied { font-size: 9px; color: #44cc88; display: none; margin-top: 2px; }
     /* ── TRANSIT COUNTER ───────────────────────────────────── */
     #transit-counter {
-      position: fixed; left: 12px; bottom: 170px; z-index: 5;
+      position: fixed; left: 12px; bottom: 240px; z-index: 5;
       background: rgba(4,10,20,0.88); border: 1px solid var(--border);
       padding: 6px 10px; cursor: pointer; font-size: 10px;
       letter-spacing: 1px; color: var(--dim); transition: all 0.2s;
@@ -688,7 +688,7 @@
 <button id="btn-present" title="Toggle presentation mode for big screen">⛶ PRESENT</button>
 <button id="btn-tour" title="Guided demo tour — walks through all features with explanations">▶ GUIDED TOUR</button>
 <button id="airport-intel-btn" title="Toggle AI aircraft counts at all scanned airports">✈ AIR INTEL</button>
-<button id="survey-btn" title="Draw a box over any area — auto-tiles into 3×3 grid and produces a consolidated report">🗺 SURVEY</button>
+<button id="survey-btn" title="3×3 grid scan for condensed areas — best for high-density targets (airbases, port complexes). Auto-tiles into 9 sub-frames + consolidated report.">🗺 SURVEY (3×3 GRID)</button>
 <button id="intel-btn" title="Capture current map view and analyze with local VLM">🔭 INTEL</button>
 <button id="sentinel-btn" title="Fetch Sentinel-2 satellite passes for this area (last 10 days)">🛰 SENTINEL</button>
 <div id="sentinel-panel">
@@ -787,6 +787,7 @@
   <button class="action-btn green"  id="btn-exec-route"><span class="btn-icon">▶</span><span class="btn-label">EXECUTE<br>PAINTED ROUTE</span><span class="btn-cost">tanker + 2 escorts</span></button>
   <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
   <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
+  <button class="action-btn purple" id="btn-iran-intel"><span class="btn-icon">📋</span><span class="btn-label">IRGC<br>INTEL PINS</span><span class="btn-cost">VLM-style flags</span></button>
   <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
   <div id="dpad">
     <div id="dpad-row">
@@ -981,14 +982,14 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=139"></script>
-<script src="src/ship-taxonomy.js?v=139"></script>
-<script src="src/scenarios.js?v=139"></script>
-<script src="src/routes.js?v=139"></script>
-<script src="src/exercise.js?v=139"></script>
-<script src="src/exercise-ui.js?v=139"></script>
-<script src="src/routes-ui.js?v=139"></script>
-<script type="module" src="src/main.js?v=139"></script>
+<script src="src/historical-incidents.js?v=141"></script>
+<script src="src/ship-taxonomy.js?v=141"></script>
+<script src="src/scenarios.js?v=141"></script>
+<script src="src/routes.js?v=141"></script>
+<script src="src/exercise.js?v=141"></script>
+<script src="src/exercise-ui.js?v=141"></script>
+<script src="src/routes-ui.js?v=141"></script>
+<script type="module" src="src/main.js?v=141"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>

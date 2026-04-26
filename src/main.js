@@ -630,12 +630,26 @@ function _startAIS() {
           <span style="color:#7a8896">TO</span><span style="color:#cce0ff">${v.dest || '—'}</span>
           <span style="color:#7a8896">FLAG / MMSI</span><span style="color:#cce0ff">${v.flag || ''} · ${v.mmsi || '—'}</span>
         </div>` : '';
+      // US Priority block — operator-facing "should we escort this first?" guidance
+      const usPriority = (typeof getUsPriority === 'function') ? getUsPriority(cat.id) : null;
+      const usPriorityHtml = usPriority ? `
+        <div style="border:2px solid #88ccff66;padding:8px 10px;margin-bottom:10px;background:rgba(80,150,255,0.08)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="color:#88ccff;font-size:10px;letter-spacing:2px;font-weight:bold">🇺🇸 US PRIORITY</span>
+            <span style="color:#88ccff;font-size:18px;font-weight:bold">${usPriority.score}/100</span>
+          </div>
+          <div style="background:#0d1e2a;border-radius:2px;height:8px;width:100%;margin-bottom:5px">
+            <div style="background:linear-gradient(90deg,#88ccff,#aaccff);width:${usPriority.score}%;height:8px;border-radius:2px;box-shadow:0 0 6px #88ccff66"></div>
+          </div>
+          <div style="font-size:10px;color:#cce0ff;line-height:1.5">${usPriority.why}</div>
+        </div>` : '';
       body.innerHTML = `
         <div style="margin-bottom:10px">
           <div style="color:#ff8800;font-size:15px;font-weight:bold;margin-bottom:2px">${v ? (v.flag + ' ' + v.name) : cat.name}</div>
           <div style="color:#7a8896;font-size:10px">CAT ${cat.id} · ${cat.name}</div>
         </div>
         ${cargoHtml}
+        ${usPriorityHtml}
         ${interestsHtml}
         <details style="margin-bottom:6px">
           <summary style="cursor:pointer;color:#aabbcc;font-size:10px;letter-spacing:2px;padding:4px 0">▸ TAXONOMY (RED CELL / BLUE CELL VIEW)</summary>
@@ -652,6 +666,11 @@ function _startAIS() {
             <div style="color:#ffe0c0;font-size:11px">${cat.consequences}</div>
           </div>
         </details>`;
+      // Close any open Leaflet popups so the user sees ONLY the sidebar (avoids
+      // "two windows showing the same ship" confusion)
+      if (window.game && window.game.map && typeof window.game.map.closePopup === 'function') {
+        try { window.game.map.closePopup(); } catch(e) {}
+      }
       // Defer the open one frame so any in-flight close events finish first
       requestAnimationFrame(() => { sidebar.style.display = 'block'; sidebar.dataset.openAt = String(Date.now()); });
     }, true);
@@ -724,7 +743,7 @@ function _startAIS() {
       </div>`;
     };
 
-    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true });
+    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true, autoPan: false });
     _aisVessels.set(v.mmsi, { marker, label, v, makePopup });
   });
 
@@ -1154,6 +1173,42 @@ window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
     }
     hideShipsBtn.style.background = _shipsHidden ? 'rgba(170,102,255,0.18)' : 'transparent';
     hideShipsBtn.querySelector('.btn-label').innerHTML = _shipsHidden ? 'SHOW ALL<br>SHIPS' : 'HIDE ALL<br>SHIPS';
+  });
+
+  // IRGC INTEL PINS — fictional VLM-style annotations on each IRGC unit
+  const _IRGC_INTEL = {
+    fac1: 'IRGC-N FAC sortie · 4× 5-meter Boghammar speedboats · armed: 7.62mm DShK + 107mm rocket pods · pattern matches Bandar Lengeh basin departure profile · last imagery: Sentinel-2 06:14Z',
+    fac2: 'IRGC-N FAC dispersal · ~3 small craft loitering pattern · loiter time 14 min · staging consistent with pre-swarm assembly. Maxar 30cm pulled 2h ago.',
+    fac3: 'IRGC-N FAC chokepoint screen · 2-3 craft observed in zigzag intercept geometry · range to TSS lane <8nm · classic harassment screen, NOT firing posture.',
+    fac4: 'IRGC-N FAC mid-strait ambush position · single craft loitering at depth ~150m · IMINT correlates to Abu Musa staging photo from 4d ago. Shahid Mahallati signature.',
+    sub1: 'IRGC-N Ghadir-class midget submarine · ~120t displacement · likely 2× 533mm torpedoes (Russian Test-71MKE export var) · GHADIR-881 hull number · ESM intercept showed brief surface comm 09:42Z.',
+    mine1: 'IRGC mine-laying motorboat · profile matches video DDG-102 SIGINT captured 2024 · current cargo cannot be confirmed visually, but intel from CTF 152 indicates limpet stockpile aboard.',
+  };
+  let _intelPinsShown = false;
+  let _intelPinMarkers = [];
+  const intelBtn = document.getElementById('btn-iran-intel');
+  if (intelBtn) intelBtn.addEventListener('click', () => {
+    _intelPinsShown = !_intelPinsShown;
+    if (_intelPinsShown && window.game && window.game._units) {
+      window.game._units.forEach(u => {
+        if (u.side !== 'red' || !u.marker) return;
+        const note = _IRGC_INTEL[u.id] || `IRGC ${u.type.toUpperCase()} · classification ${u.name} · OSINT pattern correlates with prior IRGC operating profile.`;
+        const ll = u.marker.getLatLng();
+        const pin = L.divIcon({
+          className:'irgc-intel-pin',
+          html:`<div style="background:rgba(8,4,12,0.94);border:1.5px solid #aa66ff;color:#aa66ff;font-family:Courier New,monospace;font-size:9px;padding:3px 7px;letter-spacing:1px;white-space:nowrap;box-shadow:0 0 6px #aa66ff44">📋 INTEL · ${u.name.split(' ')[1] || u.id}</div>`,
+          iconSize:[24,12], iconAnchor:[-6,-12],
+        });
+        const m = L.marker([ll.lat, ll.lng], { icon: pin, zIndexOffset: 350 }).addTo(window.game.map);
+        m.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;max-width:320px"><div style="color:#aa66ff;letter-spacing:2px;font-size:10px;font-weight:bold">📋 IRGC VLM ANALYSIS · ${u.name}</div><div style="margin-top:4px;line-height:1.5">${note}</div><div style="margin-top:6px;color:#666;font-size:9px">Source: simulated Llama 3.2 Vision 11B output on a Sentinel-2 frame.</div></div>`);
+        _intelPinMarkers.push(m);
+      });
+      intelBtn.style.background = 'rgba(170,102,255,0.18)';
+    } else {
+      _intelPinMarkers.forEach(m => { try { window.game.map.removeLayer(m); } catch(e){} });
+      _intelPinMarkers.length = 0;
+      intelBtn.style.background = 'transparent';
+    }
   });
 
   // RESET button — wipes exercise state + restores ships to start positions + clears overlays

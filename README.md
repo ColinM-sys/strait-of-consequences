@@ -66,10 +66,28 @@ Format follows the canonical professional wargame pattern (RAND / CSIS / NWC New
 - **Doctrinal Grounding** — Joint Chiefs Doctrine Library (JP 3-0 Joint Operations, JP 5-0 Joint Planning, JP 3-32 Maritime Operations) ingested into RAG. Blue Cell assessments reference real doctrinal language with inline citations.
 - **CSIS Analysis Library** — CSIS Hormuz wargame reports + Iran A2/AD analysis ingested into RAG. Scenario briefs cite specific CSIS analyses.
 - **ACLED Regional Feed** — Live geocoded Gulf-area incidents (last 90 days, lat 22–30N / lng 47–58E). Scenarios anchor to real ACLED records.
-- **VLM Satellite Analysis** — Draw a box anywhere on the map, capture the ArcGIS satellite image, run Llama 3.2 Vision 11B analysis: aircraft count, vessel count, infrastructure classification, position estimates. Results stream progressively as each query completes (no longer waiting 30s for all-or-nothing). When triggered from an exercise INTELLIGENCE decision (AIRBASE scenario), VLM output also appends live to the bottom-overlay sitrep entry with a green `[VLM LIVE — Llama 3.2 Vision]` callout.
-- **Interactive VLM in Exercise Mode** — AIRBASE scenario INTELLIGENCE decisions fly the map to Bandar Abbas (27.22°N 56.38°E, zoom 13), then drop the user into draw-to-select mode. User drags a box around the airport apron; live Llama 3.2 Vision analysis runs on the captured Sentinel/ArcGIS frame.
-- **Sentinel-2 Imagery** — Pull real ESA satellite passes (last 10 days) for any area. Compare before/after imagery with a drag slider. AI analysis detects ship presence and military buildup.
-- **Airport Intel Overlay** — AI-analyzed aircraft counts at 66 airports across Iran, Iraq, UAE, Saudi Arabia, Pakistan.
+### Three Distinct Imagery / VLM Tools (top-right of map)
+
+All three use the same base model (`llama3.2-vision:11b` running locally on Ollama) but serve different operational tempos:
+
+| Tool | Tiles | VLM queries | Time | Best for |
+|---|---|---|---|---|
+| 🔭 **INTEL** | 1 (whatever box you draw) | 4 parallel (aircraft / vessel / infra / position) | ~10 s | Single-shot "what's at this spot?" |
+| 🗺 **SURVEY (3×3 GRID)** | 9 (auto-split sub-frames) | ~36 total (4 per tile) | ~60-90 s | High-density target areas — airbases, port complexes — where one frame would miss detail |
+| 🛰 **SENTINEL** | Real ESA Sentinel-2 imagery | VLM on before/after diff | ~30 s + revisit pull | Time-machine analysis — see what changed at a location over the last 10 days |
+
+- **INTEL** — fast tactical lookup. Draw a box → 4 parallel VLM queries → tactical summary. Results stream progressively as each query lands (no all-or-nothing 30 s wait).
+- **SURVEY (3×3 GRID)** — thorough sweep. Auto-tiles your box into a 9-cell grid, runs the VLM on each, produces a consolidated report (*"NW corner: 2 FACs · center: dock with 3 mines staged · SE: clear water"*). Best for condensed high-density areas where INTEL would miss things.
+- **SENTINEL** — pulls real ESA Sentinel-2 satellite passes for any area, last ~10 days. Drag-slider before/after comparison. Optional VLM analysis on the temporal diff to detect ship presence shifts, military buildup, infrastructure changes.
+
+### Interactive VLM in Exercise Mode
+- AIRBASE INTEL scenario INTELLIGENCE decisions auto-fly the map to Bandar Abbas (27.22°N 56.38°E, zoom 13), then drop the user into draw-to-select mode. User drags a box around the airport apron; live Llama 3.2 Vision runs on the captured frame and the result streams into the exercise sitrep with a green `[VLM LIVE — Llama 3.2 Vision]` callout.
+
+### Airport Intel Overlay
+- ✈ AIR INTEL toggle — Iran-only filter (14 IRIAF / IRGC AF airports). Each marker has a pre-computed AI aircraft count from the `hormuz-count` custom Modelfile.
+
+### IRGC Intel Pins (📋 fictional VLM analysis on red units)
+- Action-bar toggle drops VLM-styled annotation pins on every IRGC unit (FACs, sub, mine-layer). Click a pin for a mock analysis: *"IRGC-N FAC sortie · 4× 5-meter Boghammar speedboats · armed: 7.62mm DShK + 107mm rocket pods · last imagery: Sentinel-2 06:14Z"*. Frames the demo as if the user had run the 🔭 INTEL workflow on each Red unit. Source label: "simulated Llama 3.2 Vision 11B output on a Sentinel-2 frame."
 
 ### Routes Tab (replaces Markets)
 - 🚦 ROUTES tab — 5 preset transit options for the Blue strike group. Each card shows the IRGC engagement profile as colored tags (FAC engagement range, missile chance, swarm spawn, rear intercept, mine hit chance).

@@ -85,10 +85,41 @@ function getCategory(id) {
   return ACTOR_CATEGORIES.find(c => c.id === id);
 }
 
+// US priority for ensuring safe passage (0-100). Higher = US has stronger
+// economic / strategic / treaty-ally interest in this ship transiting freely.
+// Used by ship sidebar to surface "should the convoy escort this one first?"
+const US_PRIORITY_BY_CATEGORY = {
+   1: { score: 100, why: 'US Navy / US-flagged force-protection asset. Maximum priority — domestic political + strategic.' },
+   2: { score:  95, why: 'NATO/treaty-ally military vessel. Coalition credibility; mutual-defense obligations.' },
+   3: { score:  92, why: 'Coalition logistics/sustainment. Sustains Blue forward posture in theater.' },
+   4: { score:  72, why: 'Saudi crude. Aramco supply stability matters for global oil price floor; Saudi is energy-security partner.' },
+   5: { score:  76, why: 'UAE refined products. UAE is treaty partner; refined-fuel chains matter for Gulf bases.' },
+   6: { score:  82, why: 'Qatari LNG. Qatar hosts Al Udeid; Asian LNG market stability is top US economic priority.' },
+   7: { score:  68, why: 'Kuwait/Iraq oil. Iraqi revenue feeds counter-ISIS partnership; Kuwait is treaty partner.' },
+   8: { score:  28, why: 'China-bound tanker. Limited US interest in ensuring China gets cheap oil; partial diplomatic leverage by allowing/restricting.' },
+   9: { score:  62, why: 'India-bound. India is QUAD partner but non-aligned on Iran. Moderate priority.' },
+  10: { score:  90, why: 'Japan/Korea energy. Both are US treaty allies; LNG/oil security is alliance commitment.' },
+  11: { score:  78, why: 'European commercial. NATO ally cargo; insurance + supply-chain stability.' },
+  12: { score:  52, why: 'Neutral commercial. Standard freedom-of-navigation interest; not high-priority.' },
+  13: { score:  66, why: 'Container ship. Supply-chain inflation pass-through; moderate US consumer impact.' },
+  14: { score:  90, why: 'Humanitarian / aid. Strong US legitimacy interest — UN obligations, public messaging.' },
+  15: { score:  72, why: 'Omani vessel. Oman is mediation-channel host; preserve relationship.' },
+  16: { score:  56, why: 'Port service. Disruption affects shipping confidence; moderate priority.' },
+  17: { score:  72, why: 'Energy infrastructure support. Critical for restoring offshore platform/pipeline operations.' },
+  18: { score:  58, why: 'Insurance-sensitive high-value. Loss spikes Lloyd\'s premiums — affects ALL strait transits.' },
+  19: { score:  32, why: 'Flag-of-convenience / ambiguous ownership. Often Iran-linked; limited US interest in protection.' },
+  20: { score:  62, why: 'Media-symbolic civilian. Loss = information-war cost; moderate priority.' },
+};
+function getUsPriority(actorCategory) {
+  return US_PRIORITY_BY_CATEGORY[actorCategory] || { score: 50, why: 'Unknown category — default mid-priority.' };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ACTOR_CATEGORIES, getCategory };
+  module.exports = { ACTOR_CATEGORIES, getCategory, US_PRIORITY_BY_CATEGORY, getUsPriority };
 }
 if (typeof window !== 'undefined') {
   window.ACTOR_CATEGORIES = ACTOR_CATEGORIES;
   window.getCategory = getCategory;
+  window.US_PRIORITY_BY_CATEGORY = US_PRIORITY_BY_CATEGORY;
+  window.getUsPriority = getUsPriority;
 }
