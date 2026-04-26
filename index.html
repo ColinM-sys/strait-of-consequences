@@ -643,9 +643,9 @@
     /* Coalition flags */
     #coalition-bar { padding: 7px 10px; display: flex; align-items: center; gap: 10px; }
     #coalition-label { font-size: 9px; letter-spacing: 1px; color: var(--dim); flex-shrink: 0; }
-    .cflag { font-size: 20px; opacity: 0.15; transition: all 0.5s; cursor: default; filter: grayscale(1); }
+    .cflag { font-size: 20px; opacity: 0.55; transition: all 0.3s; cursor: pointer; filter: grayscale(0.4); }
     .cflag.active { opacity: 1; filter: grayscale(0); }
-    .cflag.hostile { opacity: 1; filter: grayscale(0) hue-rotate(0deg); animation: pulse 1s infinite; }
+    .cflag.hostile { opacity: 1; filter: grayscale(0); border-bottom: 2px solid #ff5566; }
 
     /* ── PRESENTATION MODE ─────────────────────────────────────── */
     #btn-present {
@@ -786,13 +786,6 @@
   STRAIT TRANSITS
 </div>
 <div id="transit-log-panel"></div>
-
-<!-- MOVE button — floating above action bar, top-right -->
-<button class="action-btn blue" id="act-move" style="position:fixed;bottom:120px;right:360px;z-index:55;min-width:80px;height:60px;background:rgba(4,10,20,0.95);border:1px solid var(--blue);box-shadow:0 2px 10px rgba(0,0,0,0.5)">
-  <span class="btn-icon" style="font-size:16px">↗</span>
-  <span class="btn-label" style="font-size:8px">MOVE</span>
-  <span class="btn-cost" style="font-size:7px">click water</span>
-</button>
 
 <div id="action-bar">
   <button class="action-btn yellow" id="btn-hist-toggle"><span class="btn-icon">⚠</span><span class="btn-label">MINE / ATTACK<br>HISTORY</span><span class="btn-cost">show on map</span></button>
@@ -1075,17 +1068,17 @@
     <div style="font-size:9px;letter-spacing:1.5px;color:#445;margin-top:14px;text-align:right">RED CELL DOCTRINE WILL ADAPT TO YOUR CHOICE</div>
   </div>
 </div>
-<script src="src/historical-incidents.js?v=206"></script>
-<script src="src/infra-layer.js?v=206"></script>
-<script src="src/ai-features.js?v=206"></script>
-<script src="src/ship-taxonomy.js?v=206"></script>
-<script src="src/scenarios.js?v=206"></script>
-<script src="src/routes.js?v=206"></script>
-<script src="src/exercise.js?v=206"></script>
-<script src="src/exercise-ui.js?v=206"></script>
-<script src="src/routes-ui.js?v=206"></script>
-<script type="module" src="src/main.js?v=206"></script>
-<div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;right:340px;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
+<script src="src/historical-incidents.js?v=209"></script>
+<script src="src/infra-layer.js?v=209"></script>
+<script src="src/ai-features.js?v=209"></script>
+<script src="src/ship-taxonomy.js?v=209"></script>
+<script src="src/scenarios.js?v=209"></script>
+<script src="src/routes.js?v=209"></script>
+<script src="src/exercise.js?v=209"></script>
+<script src="src/exercise-ui.js?v=209"></script>
+<script src="src/routes-ui.js?v=209"></script>
+<script type="module" src="src/main.js?v=209"></script>
+<div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;right:340px;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;height:calc(100vh - 110px - 60px);max-height:none;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>
     <span id="exercise-overlay-turn" style="font-size:11px;letter-spacing:2px">TURN 1 OF 4</span>
