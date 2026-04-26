@@ -2180,7 +2180,7 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
           }, 90);
         }
       }
-      await _sleep(18);
+      await _sleep(36);
     }
   }
   this._routeRunning = false;

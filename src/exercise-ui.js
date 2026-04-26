@@ -96,6 +96,46 @@ function endExercise() {
   renderIndicators();
 }
 
+// Escalation rung descriptions — shown on click for each ladder cell
+const _RUNG_INFO = [
+  { name:'HARASS', color:'#cccc44', desc:'IRGC fast-attack craft probes, harassment, bridge-to-bridge intimidation. No kinetic action against vessels. War-risk premiums tick up modestly. Most strait-of-Hormuz incidents historically sit here.' },
+  { name:'SEIZURE', color:'#ffaa00', desc:'IRGC boards and detains a tanker. Crew held. Trigger for joint diplomatic attribution. Examples: Stena Impero (2019), GULF MERIDIAN (this exercise). Insurance +30-100 bps.' },
+  { name:'MINING', color:'#ff7700', desc:'Limpet mines or contact mines deployed in shipping lanes. Plausibly deniable. Examples: USS Samuel B. Roberts (1988), Fujairah (2019), Front Altair (2019). Insurance doubles within 72h.' },
+  { name:'STRIKE', color:'#cc2222', desc:'Anti-ship missile or cruise-missile attack on a vessel. Attribution unambiguous. Triggers UNSC emergency session. Insurance +400 bps or suspended. Examples: 2024 Houthi attacks on Red Sea shipping, 1987 USS Stark.' },
+  { name:'CLOSURE', color:'#ff2200', desc:'Iran formally declares closure or imposes blockade. ~21% of global oil flow halted. Brent +$15-25/bbl. Lloyd\'s suspends all new war-risk writes. Strait of Hormuz is bilaterally closed in this state.' },
+  { name:'WAR', color:'#990000', desc:'Open kinetic exchange between Blue and Iranian forces. Air strikes, naval engagements, possible escalation to Iranian missile barrages on Gulf bases. Strait shut. War-risk insurance market collapses entirely.' },
+];
+
+let _rungWired = false;
+function _wireRungClicks() {
+  if (_rungWired) return;
+  document.querySelectorAll('#ladder-rungs .rung').forEach((rung, idx) => {
+    rung.style.cursor = 'pointer';
+    rung.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      _showRungPopover(rung, idx);
+    });
+  });
+  _rungWired = true;
+}
+
+function _showRungPopover(rungEl, idx) {
+  document.querySelectorAll('.rung-popover').forEach(p => p.remove());
+  const info = _RUNG_INFO[idx];
+  if (!info) return;
+  const rect = rungEl.getBoundingClientRect();
+  const popover = document.createElement('div');
+  popover.className = 'rung-popover';
+  popover.style.cssText = `position:fixed;top:${rect.bottom + 8}px;right:20px;width:340px;background:rgba(0,8,16,0.97);border:1px solid ${info.color};border-left:4px solid ${info.color};padding:10px 12px;z-index:9000;font-family:Courier New,monospace;font-size:11px;color:#cce0ff;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.6)`;
+  popover.innerHTML = `<div style="color:${info.color};font-size:11px;letter-spacing:2px;font-weight:bold;margin-bottom:5px">RUNG ${idx} — ${info.name}</div>${info.desc}`;
+  document.body.appendChild(popover);
+  setTimeout(() => {
+    document.addEventListener('click', function once(ev) {
+      if (!popover.contains(ev.target)) { popover.remove(); document.removeEventListener('click', once, true); }
+    }, true);
+  }, 50);
+}
+
 // Per-scenario coalition positions. Each entry: { flagId: 'description shown on click' }.
 // Hostile = frames the flag in red. Defaults applied if scenario doesn't override.
 const _COALITION_POSITIONS_DEFAULT = {
@@ -176,9 +216,10 @@ function _wireCoalitionFlags() {
 // Sync the legacy state strip (escalation ladder + econ bar + coalition) to
 // activeExercise.indicators. Called from startExercise / renderActiveExercise / endExercise.
 function syncLegacyStateStrip() {
-  // Wire coalition click handlers ALWAYS — even when idle (no exercise active),
-  // judges should be able to click a flag and read its general position.
+  // Wire coalition + rung click handlers ALWAYS — even when idle (no exercise active),
+  // judges should be able to click a flag/rung and read what it means.
   _wireCoalitionFlags();
+  _wireRungClicks();
   // Update hostile state on each flag based on scenario + indicator state
   document.querySelectorAll('#coalition-bar .cflag').forEach(flag => {
     const pos = _coalitionPositionFor(flag.id);
@@ -197,11 +238,14 @@ function syncLegacyStateStrip() {
   const ATRISK_BY_RUNG = [0, 3, 7, 12, 18, 21]; // HARASS → WAR
   const BPD_BY_RUNG    = [0.0, 0.6, 1.3, 2.2, 3.4, 3.9]; // M BPD held up
   if (!activeExercise) {
-    // Idle defaults — strait open, baseline ~$84 Brent, no strait disruption
+    // Idle = current real-world conditions (April 2026): Brent $106, strait
+    // "largely closed" per Reuters/Fortune. War-risk shown as an extreme
+    // numeric (rather than SUSPENDED) so demo can show live up/down deltas
+    // when the user picks decisions.
     ladder.forEach(r => r.classList.remove('current'));
     if (ladder[0]) ladder[0].classList.add('current');
     if (oil)  oil.textContent  = '0% world supply';
-    if (bpd)  bpd.textContent  = '$92 Brent · 0M BPD held up';
+    if (bpd)  bpd.textContent  = '$106 Brent · baseline';
     if (ins)  ins.textContent  = '120 bps';
     if (clos) clos.textContent = 'OPEN';
     return;
@@ -209,7 +253,25 @@ function syncLegacyStateStrip() {
   const ind = activeExercise.indicators;
   const rung = Math.max(0, Math.min(5, ind.escalationRung || 0));
   ladder.forEach((r, idx) => {
-    r.classList.toggle('current', idx === rung);
+    const wasCurrent = r.classList.contains('current');
+    const isCurrent = idx === rung;
+    r.classList.toggle('current', isCurrent);
+    if (isCurrent) {
+      const info = (typeof _RUNG_INFO !== 'undefined' && _RUNG_INFO[idx]) ? _RUNG_INFO[idx] : null;
+      if (info) {
+        r.style.borderColor = info.color;
+        r.style.color       = info.color;
+        r.style.background  = info.color + '22';
+      }
+      if (!wasCurrent) {
+        r.style.animation = 'rungFlash 1.0s ease-out';
+        setTimeout(() => { r.style.animation = ''; }, 1100);
+      }
+    } else {
+      r.style.borderColor = '';
+      r.style.color       = '';
+      r.style.background  = '';
+    }
   });
   // OIL AT RISK card: % of world supply held up by strait disruption
   const atRiskPct = ATRISK_BY_RUNG[rung] ?? 0;
