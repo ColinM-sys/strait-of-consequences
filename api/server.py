@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -214,8 +214,12 @@ class IntelObservation(BaseModel):
     analysis: str
 
 class IntelQuery(BaseModel):
-    lat: float
-    lng: float
+    # Text-semantic mode (used by Intel Chat): supply query + optional n
+    query: Optional[str] = None
+    n: int = 8
+    # Geo-proximity mode (used by map panel): supply lat + lng
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     radius_deg: float = 0.5
     limit: int = 5
 
@@ -238,7 +242,31 @@ async def save_intel(obs: IntelObservation):
 
 @app.post("/intel/query")
 async def query_intel(q: IntelQuery):
-    # Pull candidate observations then filter by proximity
+    # ── Text-semantic mode (Intel Chat RAG) ──────────────────────────────────
+    if q.query:
+        try:
+            results = _intel_col.query(
+                query_texts=[q.query],
+                n_results=min(q.n, _intel_col.count() or 1),
+                include=["documents", "metadatas", "distances"],
+            )
+            docs  = results["documents"][0] if results["documents"] else []
+            metas = results["metadatas"][0]  if results["metadatas"]  else []
+            dists = results["distances"][0]  if results["distances"]  else []
+            hits = [
+                {"text": doc, "meta": meta, "score": round(1.0 - dist, 4)}
+                for doc, meta, dist in zip(docs, metas, dists)
+            ]
+            return {
+                "results": hits,
+                "observations": [{"analysis": h["text"], "meta": h["meta"]} for h in hits],
+            }
+        except Exception as e:
+            return {"results": [], "observations": [], "error": str(e)}
+
+    # ── Geo-proximity mode (map panel) ────────────────────────────────────────
+    if q.lat is None or q.lng is None:
+        return {"observations": [], "results": [], "error": "Provide query text or lat+lng"}
     try:
         results = _intel_col.get(include=["documents", "metadatas"])
         nearby = []
@@ -247,9 +275,13 @@ async def query_intel(q: IntelQuery):
             if dist <= q.radius_deg:
                 nearby.append({"analysis": doc, "meta": meta, "dist": round(dist, 4)})
         nearby.sort(key=lambda x: x["meta"].get("saved_at", ""))
-        return {"observations": nearby[-q.limit:][::-1]}  # most recent first
+        obs = nearby[-q.limit:][::-1]   # most recent first
+        return {
+            "observations": obs,
+            "results": [{"text": o["analysis"], "meta": o["meta"]} for o in obs],
+        }
     except Exception as e:
-        return {"observations": [], "error": str(e)}
+        return {"observations": [], "results": [], "error": str(e)}
 
 @app.get("/intel/all")
 async def all_intel():

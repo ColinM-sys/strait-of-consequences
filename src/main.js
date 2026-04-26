@@ -481,18 +481,18 @@ function _aisIcon(shipType, flag, cogDeg = 90) {
     html: `<div style="
         transform:rotate(${rot}deg);
         transform-origin:center;
-        width:64px;height:22px;
+        width:42px;height:14px;
         background:${bg};
-        border:2px solid ${bdr};
-        border-radius:4px 12px 12px 4px;
-        box-shadow:0 0 8px ${bdr}aa;
+        border:1.5px solid ${bdr};
+        border-radius:3px 8px 8px 3px;
+        box-shadow:0 0 6px ${bdr}aa;
         cursor:pointer;
         box-sizing:border-box">
     </div>
-    <div style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:13px;line-height:1;white-space:nowrap;pointer-events:none;text-shadow:0 0 4px #000">${f}</div>`,
+    <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;white-space:nowrap;pointer-events:none;text-shadow:0 0 3px #000">${f}</div>`,
     className: '',
-    iconSize: [64, 22],
-    iconAnchor: [32, 11],
+    iconSize: [42, 14],
+    iconAnchor: [21, 7],
   });
 }
 
@@ -2579,6 +2579,32 @@ async function _chatSend() {
     ctxCount = results.length;
     context = results.map(x => x.text).join('\n\n');
   } catch(e) { /* RAG offline — answer from model only */ }
+
+  // ── Ship-aware augmentation ────────────────────────────────────────────────
+  // If the question references "ship", "vessel", "tanker", "cargo", a flag, or
+  // any specific SIM_VESSEL name, inject the live ship roster as additional
+  // context so the LLM can answer "who's transiting now?" / "what cargo is X?"
+  try {
+    const lower = q.toLowerCase();
+    const shipKeywords = ['ship','vessel','tanker','cargo','transit','flag','flagged','mmsi','convoy','escort'];
+    const matchesKeyword = shipKeywords.some(k => lower.includes(k));
+    const matchesShipName = (typeof SIM_VESSELS !== 'undefined' ? SIM_VESSELS : (window.SIM_VESSELS || []))
+      .some(v => v.name && lower.includes(v.name.toLowerCase()));
+    if (matchesKeyword || matchesShipName) {
+      const vessels = (typeof SIM_VESSELS !== 'undefined' ? SIM_VESSELS : (window.SIM_VESSELS || []));
+      const cat = (typeof getCategory === 'function') ? getCategory : (window.getCategory || (() => null));
+      const roster = vessels.map(v => {
+        const c = cat(v.actorCategory);
+        const interests = (v.interests || []).map(i => `${i.c} ${i.s}/100 (${i.r})`).join('; ');
+        return `${v.flag || ''} ${v.name} — type ${v.type}, MMSI ${v.mmsi}. Cargo: ${v.cargo || '—'}. From: ${v.origin || '—'} → To: ${v.dest || '—'}. Speed: ${v.sog ? v.sog.toFixed(1)+' kn' : '—'}. Position: ${v.lat?.toFixed(2)}°N ${v.lng?.toFixed(2)}°E.`
+          + (c ? ` Actor category ${c.id}: ${c.name}. If struck: ${c.consequences}.` : '')
+          + (interests ? ` Stakeholders: ${interests}.` : '');
+      }).join('\n\n');
+      const shipBlock = `\n\nLIVE AIS SHIP ROSTER (${vessels.length} vessels currently transiting the strait):\n${roster}`;
+      context = (context || '') + shipBlock;
+      ctxCount += vessels.length;
+    }
+  } catch (e) { console.warn('ship-aware augment failed:', e.message); }
 
   ctxEl.textContent = ctxCount > 0 ? `CONTEXT: ${ctxCount} intel docs retrieved` : 'RAG OFFLINE — answering from model knowledge';
 

@@ -255,7 +255,7 @@ function shipSVG(type, side, selected) {
 
 function makeIcon(type, side, selected=false, headingDeg=0) {
   const svg  = shipSVG(type, side, selected);
-  const size = type==='carrier' ? 68 : type==='tanker' ? 60 : type==='fac' ? 36 : type==='coastal_battery' ? 48 : 52;
+  const size = type==='carrier' ? 48 : type==='tanker' ? 42 : type==='fac' ? 26 : type==='coastal_battery' ? 34 : 36;
   return L.divIcon({
     html: `<div class="ship-marker${selected?' ship-selected':''}" title="${type}"
               style="transform:rotate(${headingDeg}deg);transform-origin:center">${svg}</div>`,
