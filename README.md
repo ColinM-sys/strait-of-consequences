@@ -10,7 +10,18 @@
 **Track:** Wargaming
 **Repo:** https://github.com/ColinM-sys/strait-of-consequences
 
-**What we built:** A locally-hosted, air-gapped AI wargame exercise tool that simulates crisis escalation in the Strait of Hormuz. Replaces the months-long analog wargame design + days-long adjudication cycle with a same-session loop: scenario brief → multi-turn injects → Blue Cell DIME+ decisions → AI-adjudicated effects + indicator deltas + live map visualization. Includes a live AI Red Cell adversary (FACs pursue + fire missiles, sub launches torpedoes) with realistic ROE-bounded fire discipline (3-shot global cap), Monte-Carlo adversary spawning, hand-authored 40-decision branching tree, dynamic oil-at-risk metric computed live from real cargo-manifest data, ChromaDB-backed RAG intelligence chat over insurance/sanctions/shadow-fleet docs, live OpenStreetMap infrastructure layer (840 real strategic assets), and live VLM analysis on user-drawn satellite imagery — all on a single GPU, zero cloud LLM calls, zero API keys.
+**What we built:** A locally-hosted, air-gapped AI wargame exercise tool that simulates crisis escalation in the Strait of Hormuz. Replaces the months-long analog wargame design + days-long adjudication cycle with a same-session loop: scenario brief → multi-turn injects → Blue Cell DIME+ decisions → AI-adjudicated effects + indicator deltas + live map visualization.
+
+**Six AI/LLM agent features** all running on a single local GPU via Ollama (zero cloud, zero API keys):
+
+1. **🤖 AI Scenario Generator** — type a one-line crisis premise, Llama 3.1 8B writes a complete 4-turn scenario with 5 DIME+ decision cards per turn. The "modular wargaming platform" the SCSP brief asked for.
+2. **🛰 AI Order-of-Battle Generator** — type a theater (Hormuz / Taiwan Strait / Red Sea), get realistic Blue + Red force structure with weapons + capabilities + map markers.
+3. **AI After-Action Review** — at the end of every transit, Llama 3.1 8B reads the full event log + Blue's command decisions + indicator deltas and writes 3-5 doctrinal observations. Auto-renders inside the AAR modal.
+4. **AI-Driven Adaptive Red Cell** — `POST /redcell/decide` endpoint exposes an LLM-driven Red Cell that picks ESCALATE/HOLD/DEESCALATE/COVERT based on scenario state + Blue's last action, with full rationale.
+5. **📡 Gulf Events Feed** — 16 ACLED-style cached geocoded incidents (April 2026) drop as color-coded pins on the map. Click for full event detail.
+6. **AI Adjudicator** — `/scenario/next_turn` endpoint generates fresh next-turn injects + 5 brand-new DIME+ decisions on the fly. Strict JSON-schema validated; diff-context prompt + per-call random seed prevent repetition.
+
+Plus the original Monte-Carlo backbone: live AI Red Cell adversary (FACs pursue + fire missiles, sub launches torpedoes) with realistic ROE-bounded fire discipline (3-shot global cap), freeze-on-engagement Blue command modal with adaptive doctrine table, dynamic oil-at-risk metric from real cargo manifests, 840 OSM strategic-asset features ingested into the RAG corpus, ChromaDB-backed INTEL CHAT over 863 docs total, and live VLM analysis on user-drawn satellite imagery.
 
 **Datasets / APIs used:**
 - **OpenStreetMap / Overpass API** — Persian Gulf strategic-asset infrastructure (840 real-world features: ports, refineries, oil terminals, airports, military bases, naval bases, power plants). Cached via `api/seed_osm_infra.py` to `osm_infra.json`, rendered as the 🌐 OSM INFRASTRUCTURE toggle layer.
@@ -43,6 +54,21 @@ Open `http://localhost:3000`. One-shot Linux/macOS/Git-Bash launch: `./start.sh`
 ---
 
 A locally-hosted, air-gapped wargame exercise tool simulating crisis escalation in the Strait of Hormuz. Format follows the canonical professional wargame pattern (RAND / CSIS / NWC Newport / NSC crisis sims): scenario brief → multi-turn injects → Blue Cell decisions → adjudicated effects + indicator deltas. Map and ships serve as the visualization layer; the loop is decision-driven, not unit-movement-driven.
+
+---
+
+## Six AI Agent Features (added in v2)
+
+| # | Feature | Endpoint | LLM | Where |
+|---|---|---|---|---|
+| 1 | Scenario Generator | `POST /scenario/generate` | Llama 3.1 8B | 🤖 button on action bar |
+| 2 | OOB Generator | `POST /scenario/oob` | Llama 3.1 8B | 🛰 button on action bar |
+| 3 | AI AAR Observations | `POST /aar/observations` | Llama 3.1 8B | Auto-injects into AAR modal at transit end |
+| 4 | Adaptive Red Cell | `POST /redcell/decide` | Llama 3.1 8B | `window.OllamaRedCell.decide(...)` runtime API |
+| 5 | Gulf Events Feed | `GET /gdelt/feed` | (cached JSON) | 📡 button on action bar |
+| 6 | AI Adjudicator | `POST /scenario/next_turn` | Llama 3.1 8B | Enable with `window.AI_ADJUDICATE = true` |
+
+All endpoints validated for JSON schema with retry-on-malformed; per-call random seed for variation; runs locally on Ollama with zero cloud calls.
 
 ---
 

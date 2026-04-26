@@ -107,6 +107,8 @@ CRITICAL RULES:
 - Decision titles must reference SPECIFIC ASSETS, NAMES, or LOCATIONS from the scenario (e.g., "USS NITZE", "GULF MERIDIAN", "Bandar Abbas", "Lloyd's", "CTF 152") — not generic phrases like "Conduct intel operation".
 - Avoid textbook NSC options (UNSC, SPR, sanctions) UNLESS they directly follow from Blue's pick.
 - Vary the indicator deltas — they should reflect the unique trade-offs of THIS specific moment in THIS specific scenario, not generic +2/-1 patterns.
+- DO NOT REPEAT the structure, tone, or actor focus of any prior turn injects you've seen. If prior injects featured "Tehran's MFA" or "IRGC commander", shift to a DIFFERENT actor lens (e.g., maritime industry, Lloyd's, civilian press, regional partner).
+- DO NOT REPEAT decision titles or themes from prior turns. The Blue Cell already saw those options.
 
 OUTPUT SHAPE:
 1. "inject" — 1-3 sentences. MUST reference Blue's last pick. Tehran's response + situational shift.
@@ -293,3 +295,190 @@ async def all_intel():
         return {"observations": obs, "total": len(obs)}
     except Exception as e:
         return {"observations": [], "error": str(e)}
+
+
+# ── AI agent endpoints (scenario gen, OOB, adaptive Red Cell, AAR observations) ──
+
+import json as _json
+import os as _os
+
+OLLAMA_URL_LOCAL = "http://localhost:11434"
+OLLAMA_MODEL_LOCAL = "llama3.1:8b"
+
+
+def _llm_json(system: str, user: str, temp: float = 0.85, num_predict: int = 1200, retries: int = 2):
+    """Call Ollama with JSON mode + retries until valid JSON returned."""
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            with httpx.Client(timeout=180.0) as client:
+                r = client.post(f"{OLLAMA_URL_LOCAL}/api/chat", json={
+                    "model": OLLAMA_MODEL_LOCAL, "stream": False,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "options": {"temperature": temp, "num_predict": num_predict, "num_ctx": 6144,
+                                "seed": int.from_bytes(_os.urandom(4), 'big')},
+                    "format": "json",
+                })
+            raw = (r.json().get("message", {}) or {}).get("content", "") or ""
+            parsed = _extract_json(raw)
+            if parsed:
+                return parsed, raw
+        except Exception as e:
+            last_err = str(e)
+    return None, last_err or "no valid JSON after retries"
+
+
+SCENARIO_GEN_SYSTEM = """You are a senior wargame scenario designer at NWC Newport. Generate a complete 4-turn Hormuz strait wargame scenario from a one-line premise.
+
+CONSTRAINTS:
+- Reference REAL geography: Bandar Abbas, Larak, Qeshm, Abu Musa, Greater/Lesser Tunb, Fujairah, Khor Fakkan, Ras Tanura, Jebel Ali, Kharg Island, Bandar Lengeh, Mina al Fahal.
+- Reference REAL forces: USN CSG (CVN-76 / DDG-102 / DDG-119 / CG-62), IRGC FACs (Boghammar, Peykaap), IRIN frigates (Jamaran-class), Ghadir-class submarines.
+- Reference REAL economic actors: Lloyd's JWC, OFAC, Aramco, ADNOC, CTF 152.
+- Indicators must be plausible: oilPrice 80-180, warRiskInsurance 100-2500, escalationRung 0-6.
+- Each turn's 5 decisions must cover ALL 5 lanes: DIPLOMATIC / INFORMATION / MILITARY / ECONOMIC / INTELLIGENCE.
+- Decision titles: ACTION-VERB + SPECIFIC ASSET (e.g., "Forward-deploy DDG-102 within 3 nm of Larak").
+
+OUTPUT JSON SHAPE:
+{"id":"kebab-id","title":"ALL CAPS","rung":"HARASS|SEIZURE|MINING|STRIKE|CLOSURE","rungColor":"#hex","threat":"...","summary":"...","keyVessels":[],"initialIndicators":{"escalationRung":int,"oilPrice":int,"warRiskInsurance":int,"allianceCohesion":60,"attributionConfidence":60,"iranCoercion":50},"turns":[{"inject":"...","decisions":[{"lane":"DIPLOMATIC","title":"...","assessment":"...","deltas":{"escalationRung":0,"oilPrice":0,"warRiskInsurance":0,"allianceCohesion":0,"attributionConfidence":0,"iranCoercion":0}},...5 cards],...4 turns]}
+
+Output ONLY valid JSON. No markdown."""
+
+
+class ScenarioGenRequest(BaseModel):
+    premise: str
+
+
+@app.post("/scenario/generate")
+async def post_scenario_generate(req: ScenarioGenRequest):
+    user_prompt = (
+        f"Premise: {req.premise.strip()}\n\n"
+        f"Generate the full scenario JSON. 4 turns. 5 DIME+ decisions per turn. "
+        f"Make Turn 1 the inciting incident, Turn 2 escalation pressure, "
+        f"Turn 3 international response + insurance market reaction, "
+        f"Turn 4 the off-ramp / escalation decision point."
+    )
+    parsed, raw = _llm_json(SCENARIO_GEN_SYSTEM, user_prompt, temp=0.95, num_predict=4000)
+    if not parsed:
+        return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:500]}
+    if "turns" not in parsed or len(parsed.get("turns", [])) != 4:
+        return {"ok": False, "error": "wrong_turn_count", "got": len(parsed.get("turns", []))}
+    return {"ok": True, "scenario": parsed}
+
+
+REDCELL_SYSTEM = """You are an IRGC operations officer running a Red Cell adversary simulation.
+Given the current scenario state and what Blue just did, decide Iran's next move.
+
+You ALWAYS pick from these 4 doctrine responses:
+- ESCALATE: order second-strike package, deploy more FACs, harden mining
+- HOLD: maintain current posture, no further kinetic action
+- DEESCALATE: signal off-ramp, recall FACs, accept Omani mediation
+- COVERT: deny attribution, switch to non-kinetic disruption (cyber, AIS spoofing)
+
+Reasoning factors: casualty-averse Tehran, Lloyd's premium feedback, China's diplomatic exposure, IRGC vs. Artesh tension.
+
+Output JSON: {"choice":"ESCALATE|HOLD|DEESCALATE|COVERT","rationale":"<2-3 sentence reasoning>","next_action":"<1-sentence specific action>","indicator_deltas":{"escalationRung":int,"warRiskInsurance":int,"iranCoercion":int}}
+Output ONLY valid JSON."""
+
+
+class RedCellRequest(BaseModel):
+    scenario_title: str
+    rung: str
+    blue_action: str
+    current_indicators: dict
+    prior_red_actions: List[str] = []
+
+
+@app.post("/redcell/decide")
+async def post_redcell_decide(req: RedCellRequest):
+    prior = "\n".join(f"  - {a}" for a in (req.prior_red_actions or [])) or "  (none)"
+    user_prompt = (
+        f"Scenario: {req.scenario_title} ({req.rung} rung)\n"
+        f"Blue just did: {req.blue_action}\n"
+        f"Current indicators: {_json.dumps(req.current_indicators)}\n"
+        f"Iran's prior actions this exercise:\n{prior}\n\n"
+        f"What does Iran do next?"
+    )
+    parsed, raw = _llm_json(REDCELL_SYSTEM, user_prompt, temp=0.85, num_predict=400)
+    if not parsed or "choice" not in parsed:
+        return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:300]}
+    return {"ok": True, "decision": parsed}
+
+
+AAR_SYSTEM = """You are a wargame after-action review (AAR) author at NWC Newport.
+Given a transit's event log + Blue's command decisions + indicator deltas, write 3-5 doctrinal observations.
+
+EACH observation must:
+- Reference a specific event from the log (FAC fire, hit, intercept, sweep)
+- Reference Blue's specific ROE-level choice
+- Cite a doctrine concept where relevant (CIWS performance, ROE Level N, alliance signaling, market pass-through, distributional analysis)
+- Be 1-2 sentences max
+- NOT use generic phrases like "good job" or "more research needed"
+
+Output JSON: {"observations":[{"icon":"✓|⚠|⊠|⚓|⚔|🔴|✗","text":"..."}]}
+3 to 5 observations. Output ONLY valid JSON."""
+
+
+class AarRequest(BaseModel):
+    outcome: str
+    duration_sec: int
+    blue_choice: Optional[str]
+    events: List[dict]
+    indicators_before: dict
+    indicators_after: dict
+
+
+@app.post("/aar/observations")
+async def post_aar_observations(req: AarRequest):
+    events_summary = "\n".join(f"  - [{e.get('type')}] {_json.dumps({k: v for k, v in e.items() if k not in ('type', 't')})}" for e in (req.events or [])) or "  (none)"
+    user_prompt = (
+        f"Transit outcome: {req.outcome}\n"
+        f"Duration: {req.duration_sec}s\n"
+        f"Blue ROE choice: {req.blue_choice or '(no engagement)'}\n"
+        f"Events:\n{events_summary}\n"
+        f"Indicators before: {_json.dumps(req.indicators_before)}\n"
+        f"Indicators after: {_json.dumps(req.indicators_after)}\n\n"
+        f"Write 3-5 AAR observations now."
+    )
+    parsed, raw = _llm_json(AAR_SYSTEM, user_prompt, temp=0.75, num_predict=600)
+    if not parsed or "observations" not in parsed:
+        return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:300]}
+    return {"ok": True, "observations": parsed["observations"]}
+
+
+OOB_SYSTEM = """You are a defense intelligence analyst writing an Order of Battle dossier.
+Generate a realistic regional OOB for the user's specified theater.
+
+OUTPUT JSON: {"theater":"...","blue_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"red_force":[{"unit":"...","type":"...","lat":float,"lng":float,"capability":"..."}],"key_terrain":[{"name":"...","lat":float,"lng":float,"significance":"..."}]}
+
+Use real coordinates. Use real platform names. Output ONLY valid JSON."""
+
+
+class OobRequest(BaseModel):
+    theater: str
+
+
+@app.post("/scenario/oob")
+async def post_oob(req: OobRequest):
+    user_prompt = f"Generate realistic Order of Battle for: {req.theater.strip()}\n\n6-10 Blue units, 6-10 Red units, 4-6 key terrain features."
+    parsed, raw = _llm_json(OOB_SYSTEM, user_prompt, temp=0.8, num_predict=2000)
+    if not parsed:
+        return {"ok": False, "error": "invalid_llm_output", "raw": str(raw)[:300]}
+    return {"ok": True, "oob": parsed}
+
+
+@app.get("/gdelt/feed")
+async def get_gulf_events():
+    """Returns cached Gulf-region events from gulf_events.json."""
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    path = _os.path.normpath(_os.path.join(here, "..", "gulf_events.json"))
+    if not _os.path.exists(path):
+        return {"ok": False, "error": "gulf_events.json not present — run seed_gulf_events.py", "events": []}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        return {"ok": True, "events": data.get("events", []), "source": data.get("source", "ACLED-cached"), "count": len(data.get("events", []))}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "events": []}
