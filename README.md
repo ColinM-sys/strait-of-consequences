@@ -26,13 +26,18 @@ A **fully air-gapped, locally-hosted AI wargame** that compresses months of anal
 - **Freeze-on-engagement modal** — when Iran fires during simulation, transit pauses, Blue Cell picks ROE response, adaptive Red doctrine adjusts for the rest of the run
 - **AAR debrief** at end of every transit with AI-generated doctrinal observations
 
-**Six AI agent endpoints** (all local LLM):
-1. **AI Scenario Generator** — type a one-line crisis premise, get a full 4-turn DIME+ scenario in 30–60s
-2. **AI Order-of-Battle Generator** — type any theater (Hormuz / Taiwan Strait / Red Sea), get realistic Blue + Red OOB
-3. **AI After-Action Review** — Llama 3.1 8B reads transit event log + writes 3-5 doctrinal observations
-4. **Adaptive Red Cell** — LLM picks Iran's response (ESCALATE / HOLD / DEESCALATE / COVERT) with rationale
-5. **Adjudicator** — generates fresh next-turn injects + 5 brand-new decisions per Blue choice
-6. **Gulf Events Feed** — 16 cached ACLED-style geocoded April 2026 incidents
+**Six LLM agents** (all Llama 3.1 8B, local):
+1. **Scenario Designer** — type a one-line crisis premise, get a full 4-turn DIME+ scenario in 30–60s
+2. **OOB Analyst** — type any theater (Hormuz / Taiwan Strait / Red Sea), get realistic Blue + Red Order of Battle
+3. **AAR Author** — reads transit event log + writes 3-5 doctrinal after-action observations
+4. **Red Cell** — picks Iran's response (ESCALATE / HOLD / DEESCALATE / COVERT) with rationale, adapts to Blue's actions
+5. **White-Cell Adjudicator** — generates fresh next-turn injects + 5 brand-new DIME+ decisions per Blue pick
+6. **Intelligence Analyst** — RAG-grounded chat over 863 docs (insurance / sanctions / shadow fleet / 840 OSM strategic assets)
+
+**Three LLM vision tools** (Llama 3.2 Vision 11B + custom `hormuz-vision`/`hormuz-count` Modelfiles):
+- 🔭 **INTEL** — single-shot 4-query VLM scan on a user-drawn map box (~10s)
+- 🗺 **SURVEY** — 3×3 grid VLM analysis (~90s) for high-density areas
+- 🛰 **SENTINEL** — real ESA Sentinel-2 imagery before/after diff with VLM
 
 **RAG-grounded INTEL CHAT:**
 - ChromaDB persistent corpus with **863 docs**: 23 hand-curated insurance / sanctions / shadow-fleet / IMO-TSS / historical-incident docs + 840 OpenStreetMap strategic-asset features (refineries, oil terminals, airports, ports, military bases, naval bases, power plants)
@@ -167,18 +172,34 @@ Click ▶ AUTO DEMO LOOP again or press **Esc** to abort. Loops automatically un
 
 ---
 
-## Six AI Agent Features (added in v2)
+## 6 LLM Agents + 3 LLM Vision Tools
 
-| # | Feature | Endpoint | LLM | Where |
-|---|---|---|---|---|
-| 1 | Scenario Generator | `POST /scenario/generate` | Llama 3.1 8B | 🤖 button on action bar |
-| 2 | OOB Generator | `POST /scenario/oob` | Llama 3.1 8B | 🛰 button on action bar |
-| 3 | AI AAR Observations | `POST /aar/observations` | Llama 3.1 8B | Auto-injects into AAR modal at transit end |
-| 4 | Adaptive Red Cell | `POST /redcell/decide` | Llama 3.1 8B | `window.OllamaRedCell.decide(...)` runtime API |
-| 5 | Gulf Events Feed | `GET /gdelt/feed` | (cached JSON) | 📡 button on action bar |
-| 6 | AI Adjudicator | `POST /scenario/next_turn` | Llama 3.1 8B | Enable with `window.AI_ADJUDICATE = true` |
+All running on **local Ollama** with `keep_alive: -1` (model permanently resident in VRAM). Zero cloud calls. Zero API keys.
 
-All endpoints validated for JSON schema with retry-on-malformed; per-call random seed for variation; runs locally on Ollama with zero cloud calls.
+### 6 LLM Agents (Llama 3.1 8B)
+
+| # | Agent role | Endpoint | Where |
+|---|---|---|---|
+| 1 | **Scenario Designer** — crafts a 4-turn wargame from a one-line premise | `POST /scenario/generate` | 🤖 AI GENERATE SCENARIO button |
+| 2 | **OOB Analyst** — generates Blue + Red force structure for any theater | `POST /scenario/oob` | 🛰 AI GENERATE ORDER OF BATTLE button |
+| 3 | **AAR Author** — writes 3-5 doctrinal observations from a transit event log | `POST /aar/observations` | Auto-fires inside the AAR modal at transit end |
+| 4 | **Red Cell** — adapts Iran's response (ESCALATE / HOLD / DEESCALATE / COVERT) to Blue's last action | `POST /redcell/decide` | `window.OllamaRedCell.decide()` runtime API |
+| 5 | **White-Cell Adjudicator** — generates fresh inject + 5 brand-new DIME+ decisions per Blue pick | `POST /scenario/next_turn` | Enable with `window.AI_ADJUDICATE = true` |
+| 6 | **Intelligence Analyst** — RAG-grounded chat over 863 docs with ship-aware augmentation | `POST /intel/query` + Ollama `/api/generate` | 💬 INTEL CHAT panel |
+
+### 3 LLM Vision Tools (Llama 3.2 Vision 11B)
+
+| Tool | What it does | Custom Modelfile |
+|---|---|---|
+| 🔭 **INTEL** — fast tactical lookup | Draw a box → 4 parallel queries (aircraft / vessels / infrastructure / position) in ~10s | `hormuz-vision` |
+| 🗺 **SURVEY (3×3 GRID)** — high-density target areas | Auto-tiles the bbox into 9 sub-frames + runs 36 VLM queries → consolidated report | `hormuz-count` |
+| 🛰 **SENTINEL** — time-machine imagery | Real ESA Sentinel-2 passes for any bbox, last 10 days. Drag-slider before/after + VLM diff analysis | base `llama3.2-vision:11b` |
+
+### Plus a cached non-AI feed
+
+- **📡 Gulf Events Feed** — 16 hand-curated ACLED-style geocoded April 2026 incidents served from `gulf_events.json`. Not an LLM agent; just data.
+
+All 6 agent endpoints validate JSON schema with retry-on-malformed; per-call random seed for variation; pre-warmed at backend boot so the first judge-facing call doesn't pay the model-load cost.
 
 ---
 
