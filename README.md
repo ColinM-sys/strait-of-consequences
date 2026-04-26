@@ -147,6 +147,26 @@ The wargaming track judges are wargamers. They've worked at SCIFs. They know tha
 
 ---
 
+## ▶ Auto-Demo Loop
+
+The action bar has a **▶ AUTO DEMO LOOP** button that walks through every major feature hands-free with narration banners. 11 steps over ~5–6 minutes per loop:
+
+1. Introduction with air-gap claim
+2. Open EXERCISE tab
+3. Click first scenario → bottom overlay with brief + decisions
+4. Pick a DIME+ decision → indicator deltas + map effects
+5. Toggle OSM Infrastructure (840 strategic assets)
+6. Open Gulf Events Feed (16 cached April 2026 incidents)
+7. Highlight INTEL + SURVEY VLM buttons
+8. Open Sentinel-2 modal (real ESA satellite imagery)
+9. AI Scenario Generator with auto-typed premise
+10. Spawn Adversaries (×2) + Simulate Blue Transit + auto-pick ACTIVE_DEFENSE on engagement modal + watch AAR
+11. AI Order-of-Battle for Taiwan Strait + auto-render on map
+
+Click ▶ AUTO DEMO LOOP again or press **Esc** to abort. Loops automatically until aborted. Use case: leave it running at a Phase 2 booth as walk-up demo while you handle conversations.
+
+---
+
 ## Six AI Agent Features (added in v2)
 
 | # | Feature | Endpoint | LLM | Where |
