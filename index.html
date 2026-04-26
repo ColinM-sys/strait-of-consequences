@@ -790,6 +790,7 @@
   <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
   <button class="action-btn purple" id="btn-iran-intel"><span class="btn-icon">📋</span><span class="btn-label">IRGC<br>INTEL PINS</span><span class="btn-cost">VLM-style flags</span></button>
   <button class="action-btn red"    id="btn-spawn-adv"><span class="btn-icon">🎲</span><span class="btn-label">SPAWN<br>ADVERSARIES</span><span class="btn-cost">Monte-Carlo roll</span></button>
+  <button class="action-btn cyan"   id="btn-osm-infra"><span class="btn-icon">🌐</span><span class="btn-label">OSM<br>INFRASTRUCTURE</span><span class="btn-cost">live OSM data</span></button>
   <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
   <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
   <div id="dpad">
@@ -985,14 +986,15 @@
   </div>
 </div>
 
-<script src="src/historical-incidents.js?v=156"></script>
-<script src="src/ship-taxonomy.js?v=156"></script>
-<script src="src/scenarios.js?v=156"></script>
-<script src="src/routes.js?v=156"></script>
-<script src="src/exercise.js?v=156"></script>
-<script src="src/exercise-ui.js?v=156"></script>
-<script src="src/routes-ui.js?v=156"></script>
-<script type="module" src="src/main.js?v=156"></script>
+<script src="src/historical-incidents.js?v=157"></script>
+<script src="src/infra-layer.js?v=157"></script>
+<script src="src/ship-taxonomy.js?v=157"></script>
+<script src="src/scenarios.js?v=157"></script>
+<script src="src/routes.js?v=157"></script>
+<script src="src/exercise.js?v=157"></script>
+<script src="src/exercise-ui.js?v=157"></script>
+<script src="src/routes-ui.js?v=157"></script>
+<script type="module" src="src/main.js?v=157"></script>
 <div id="exercise-overlay" style="display:none;position:fixed;bottom:110px;left:0;z-index:50;background:rgba(0,4,12,0.94);backdrop-filter:blur(4px);border-top:2px solid #ff660066;border-bottom:2px solid #ff660066;color:#cce0ff;font-family:'Courier New',monospace;max-height:65vh;min-height:200px;overflow-y:auto">
   <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center">
     <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>

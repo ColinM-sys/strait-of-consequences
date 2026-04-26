@@ -10,19 +10,18 @@
 **Track:** Wargaming
 **Repo:** https://github.com/ColinM-sys/strait-of-consequences
 
-**What we built:** A locally-hosted, air-gapped AI wargame exercise tool that simulates crisis escalation in the Strait of Hormuz. Replaces the months-long analog wargame design + days-long adjudication cycle with a same-session loop: scenario brief → multi-turn injects → Blue Cell DIME+ decisions → AI-adjudicated effects + indicator deltas + live map visualization. Includes a live AI Red Cell adversary (FACs pursue + fire missiles, sub launches torpedoes) with realistic ROE-bounded fire discipline (3-shot global cap), Monte-Carlo adversary spawning, hand-authored 40-decision branching tree, dynamic oil-at-risk metric computed live from real cargo-manifest data, RAG-augmented intelligence chat grounded in JCS/CSIS doctrinal corpus, and live VLM analysis on user-drawn satellite imagery — all on a single GPU, zero cloud calls, zero API keys.
+**What we built:** A locally-hosted, air-gapped AI wargame exercise tool that simulates crisis escalation in the Strait of Hormuz. Replaces the months-long analog wargame design + days-long adjudication cycle with a same-session loop: scenario brief → multi-turn injects → Blue Cell DIME+ decisions → AI-adjudicated effects + indicator deltas + live map visualization. Includes a live AI Red Cell adversary (FACs pursue + fire missiles, sub launches torpedoes) with realistic ROE-bounded fire discipline (3-shot global cap), Monte-Carlo adversary spawning, hand-authored 40-decision branching tree, dynamic oil-at-risk metric computed live from real cargo-manifest data, ChromaDB-backed RAG intelligence chat over insurance/sanctions/shadow-fleet docs, live OpenStreetMap infrastructure layer (840 real strategic assets), and live VLM analysis on user-drawn satellite imagery — all on a single GPU, zero cloud LLM calls, zero API keys.
 
 **Datasets / APIs used:**
-- **GDELT 2.0** + **ACLED** — geocoded Gulf-region incident feed for scenario seeding
-- **Joint Chiefs Doctrine Library** (JP 3-0, 3-32, 5-0) ingested into ChromaDB RAG corpus
-- **CSIS Analysis Library** Hormuz wargame reports + Iran A2/AD analysis ingested into RAG
-- **Global Terrorism Database** (1970–2020) for historical analog research (Tanker War, 2019 Fujairah limpet mines, Stena Impero seizure)
-- **OpenStreetMap / Overpass API** — live infrastructure layer (Persian Gulf ports, oil terminals, airbases)
-- **ESA Sentinel-2** (Copernicus Data Space) — before/after satellite imagery for VLM analysis
-- **ArcGIS World Imagery** — base map tiles
-- **Custom 5,400-doc military intelligence RAG corpus** (open-source, unclassified) including 20 hand-curated docs on Lloyd's JWC war-risk insurance, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules
+- **OpenStreetMap / Overpass API** — Persian Gulf strategic-asset infrastructure (840 real-world features: ports, refineries, oil terminals, airports, military bases, naval bases, power plants). Cached via `api/seed_osm_infra.py` to `osm_infra.json`, rendered as the 🌐 OSM INFRASTRUCTURE toggle layer.
+- **ArcGIS World Imagery** — satellite basemap tiles (Esri)
+- **CartoDB** dark labels overlay
+- **ESA Sentinel-2** (Copernicus Data Space) — before/after satellite imagery for VLM analysis. Auth + processing proxied through `serve.py` to keep API keys off the frontend.
+- **ChromaDB RAG corpus** with 23 hand-curated unclassified docs covering Lloyd's JWC war-risk insurance, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules, and historical Tanker War / 2019 Fujairah limpet / Stena Impero precedents (seeded via `api/seed_insurance_docs.py`)
 - **Llama 3.1 8B** (adjudication / chat) + **Llama 3.2 Vision 11B** (satellite VLM) running locally via Ollama
 - **Two custom Ollama Modelfiles** (`hormuz-vision`, `hormuz-count`) — operator-tuned overlays of base Llama 3.2 Vision
+- **Hand-curated AIS-style vessel snapshot** — 15 simulated vessels with real cargo manifests, origins, destinations, and stakeholder-interest scores reflecting April 2026 strait traffic
+- **Hand-coded historical incident dataset** — 6 geocoded Tanker War / Hormuz incidents (USS Samuel B. Roberts 1988, SS Bridgeton 1987, Fujairah limpets 2019, Front Altair / Kokuka Courageous 2019, Stena Impero 2019, M. Star 2010)
 
 **How to run:**
 ```bash
@@ -106,10 +105,9 @@ A locally-hosted, air-gapped wargame exercise tool simulating crisis escalation 
 - **Iran-Only Airport Overlay** — ✈ AIR INTEL toggle now filters to red-team bases only (14 IRIAF / IRGC AF airports across Iran: Bandar Abbas, Mehrabad, Imam Khomeini, Kish, Isfahan, Shiraz, Mashhad, Tabriz, Ahvaz, Qeshm, etc.). Other Gulf-state airports excluded.
 
 ### Intelligence & Imagery
-- **RAG Intel Chat** — Military intelligence database (5,400+ docs) powering a chat interface. Ask about IRGC tactics, order of battle, mine warfare, tanker operations.
-- **Doctrinal Grounding** — Joint Chiefs Doctrine Library (JP 3-0 Joint Operations, JP 5-0 Joint Planning, JP 3-32 Maritime Operations) ingested into RAG. Blue Cell assessments reference real doctrinal language with inline citations.
-- **CSIS Analysis Library** — CSIS Hormuz wargame reports + Iran A2/AD analysis ingested into RAG. Scenario briefs cite specific CSIS analyses.
-- **ACLED Regional Feed** — Live geocoded Gulf-area incidents (last 90 days, lat 22–30N / lng 47–58E). Scenarios anchor to real ACLED records.
+- **RAG Intel Chat** — ChromaDB-backed chat interface (23 hand-curated unclassified docs) covering Lloyd's JWC war-risk pricing, OFAC sanctions, Iranian shadow-fleet operations, IMO TSS rules, and historical Tanker War / 2019 limpet incidents. Ship-aware: when chat queries mention specific vessels, the SIM_VESSELS roster is auto-injected as additional context.
+- **Doctrinal Reference (scenario design)** — Joint Chiefs publications (JP 3-0 Joint Operations, JP 5-0 Joint Planning, JP 3-32 Maritime Operations) consulted during scenario authoring; assessment text reflects doctrinal language. (Doctrine PDFs not auto-ingested into RAG.)
+- **CSIS / RAND Reference (scenario design)** — Open CSIS Hormuz analyses + RAND wargaming literature consulted during scenario authoring. Cited inline in scenario assessment text.
 ### Three Distinct Imagery / VLM Tools (top-right of map)
 
 All three use the same base model (`llama3.2-vision:11b` running locally on Ollama) but serve different operational tempos:
@@ -208,15 +206,16 @@ All 5 Blue surface units transit together with proper standoff spacing (no overl
 
 | Source | Use |
 |---|---|
-| ArcGIS World Imagery | Satellite basemap |
-| ESA Sentinel-2 (Copernicus Data Space) | Before/after imagery comparison |
-| OpenStreetMap / Overpass API | Live infrastructure layer (ports, terminals, airbases) |
-| ACLED | Geocoded Gulf-region incident feed; scenario anchoring |
-| Joint Chiefs Doctrine Library | JP 3-0 / 5-0 / 3-32 ingested into RAG corpus |
-| CSIS Analysis Library | Hormuz wargame reports + Iran A2/AD analysis ingested into RAG |
-| Global Terrorism Database (1970–2020) | Historical analog research (1987 Tanker War, 2019 Fujairah limpet mines, 2019 Stena Impero) |
-| Simulated AIS vessel traffic | Real vessel names, MMSI, positions from April 2026 transits |
-| Military intel RAG corpus | 5,400+ open-source unclassified docs |
+| ArcGIS World Imagery (Esri) | Satellite basemap |
+| CartoDB dark labels | Place name overlay |
+| ESA Sentinel-2 (Copernicus Data Space) | Before/after imagery comparison + VLM analysis (auth proxied through serve.py) |
+| OpenStreetMap / Overpass API | 840 strategic-asset features cached to `osm_infra.json` (ports, refineries, oil terminals, airports, military / naval bases, power plants) |
+| ChromaDB RAG corpus (23 docs) | Hand-curated insurance / sanctions / shadow-fleet / IMO TSS / Tanker-War-precedent docs (seeded via `api/seed_insurance_docs.py`) |
+| Joint Chiefs publications (JP 3-0, 5-0, 3-32) | Doctrinal reference during scenario authoring; cited in assessment text |
+| CSIS / RAND Hormuz analyses | Open-source reference during scenario authoring |
+| Hand-curated SIM_VESSELS snapshot | 15 vessels with cargo manifests, flags, MMSI, origins, destinations, stakeholder-interest scores |
+| 6 historical-incident geocoded points | Tanker War + recent limpet/seizure precedents (toggle button on map) |
+| Llama 3.1 8B + Llama 3.2 Vision 11B (Ollama) | Local inference for adjudication, chat, satellite VLM |
 
 ---
 
