@@ -1337,6 +1337,9 @@ async function _runIntelAnalysis(sw, ne) {
     body.innerHTML = `<div style="font-size:10px;color:#7788aa;margin-bottom:4px">${bboxDebug}</div><img src="data:image/jpeg;base64,${b64}" style="width:100%;max-height:90px;object-fit:contain;display:block;margin-bottom:6px;border:1px solid #aa66ff"><div id="intel-stream" style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:11px;color:#c0d8e8;line-height:1.5">⟳ Analyzing...</div>`;
     const streamEl = document.getElementById('intel-stream');
 
+    // repeat_penalty: 1.3 prevents degenerate loops like "Runway 12L, Runway 12L, ..."
+    // top_p: 0.9 + temp 0.2 widens token distribution slightly so the model can recover.
+    // num_predict: 100 caps response so even if it does start looping, it can't run away.
     function ollamaAsk(question) {
       return fetch(OLLAMA_URL, {
         method: 'POST',
@@ -1345,7 +1348,7 @@ async function _runIntelAnalysis(sw, ne) {
           model: OLLAMA_MODEL,
           messages: [{ role: 'user', content: question, images: [b64] }],
           stream: false,
-          options: { temperature: 0.1, num_predict: 300 },
+          options: { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.3, num_predict: 200 },
         }),
       }).then(r => r.json()).then(d => d.message?.content ?? '');
     }
@@ -1358,7 +1361,10 @@ async function _runIntelAnalysis(sw, ne) {
           model: OLLAMA_MODEL,
           messages: [{ role: 'user', content: question, images: [b64] }],
           stream: false,
-          options: { temperature: 0.1, num_predict: 80, stop: ['\n', '\n\n', 'Answer:', 'Note:', 'Therefore'] },
+          options: {
+            temperature: 0.2, top_p: 0.9, repeat_penalty: 1.3, num_predict: 80,
+            stop: ['\n', '\n\n', 'Answer:', 'Note:', 'Therefore'],
+          },
         }),
       }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
     }
