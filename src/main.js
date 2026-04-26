@@ -2879,9 +2879,25 @@ if (typeof renderScenarioCards === 'function') {
     });
   }
 
-  // Slow decay toward rung 1 (CONTESTED) every 30s so it doesn't stay pinned high forever
-  setInterval(() => {
-    const r = window._liveEscalationRung || 0;
-    if (r > 1) _bump(-1, 'time decay');
-  }, 30000);
+  // No auto-decay — ladder ONLY changes when an actual event fires (red action, blue action,
+  // strike/mine, transit completion, etc). Static between events so judges see a clean cause-effect.
+})();
+
+// ── Wire concrete game events into the live escalation ladder ──
+(() => {
+  if (typeof window === 'undefined') return;
+  const bump = (d, why) => window._bumpLiveEscalation && window._bumpLiveEscalation(d, why);
+  // Listen for ship-impact animations (strike, mine, FAC kill, etc.)
+  window.addEventListener('hormuz:vessel-impact', (e) => {
+    const t = e.detail && e.detail.type;
+    if (t === 'STRIKE' || t === 'MINE')      bump(+1, t);
+    else if (t === 'SEIZURE')                bump(+1, 'seizure');
+    else if (t === 'CLOSURE')                bump(+2, 'closure');
+    else if (t === 'BLUE_TRANSIT_COMPLETE')  bump(-1, 'safe transit');
+  });
+  // Red spawn — light bump
+  if (window.game && typeof window.game.on === 'function') {
+    try { window.game.on('redSpawned',   () => bump(+1, 'red spawn')); } catch (e) {}
+    try { window.game.on('redCellMoved', () => bump(+1, 'red maneuver')); } catch (e) {}
+  }
 })();

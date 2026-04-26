@@ -2440,7 +2440,7 @@ function _applyResponseEffects(choice, game) {
 // ── Painted-route execution: tanker + 2 escort DDGs follow the painted path ──
 // Accepts opts.path to override (caller can pass a default route if no painted path exists)
 LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
-  const path = (opts && opts.path && opts.path.length >= 2)
+  let path = (opts && opts.path && opts.path.length >= 2)
     ? opts.path
     : ((this._lastPaintedPath && this._lastPaintedPath.length >= 2) ? this._lastPaintedPath : null);
   if (!path) {
@@ -2514,11 +2514,21 @@ LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
 
   // Compute escort offset perpendicular to current segment direction
   const PROX_KM = 90;
-  // Adaptive total animation time so long painted routes don't drag forever.
-  // Target ~22s total → distribute across segments. Clamp per-segment STEPS to [12, 60].
+  // Decimate dense painted paths to ~40 waypoints so total animation stays bounded.
+  // Drawing with the paint tool can produce hundreds of mouse-move points; we don't
+  // need that many to render a smooth route at viewing zoom.
+  const TARGET_PTS = 40;
+  if (path.length > TARGET_PTS) {
+    const stride = Math.ceil(path.length / TARGET_PTS);
+    const decimated = [];
+    for (let k = 0; k < path.length; k += stride) decimated.push(path[k]);
+    if (decimated[decimated.length - 1] !== path[path.length - 1]) decimated.push(path[path.length - 1]);
+    path = decimated;
+  }
+  // Adaptive total animation time. Target ~15s. Per-segment STEPS clamped [4, 60].
   const _segCount = Math.max(1, path.length - 1);
-  const _msPerSeg = Math.max(600, Math.round(22000 / _segCount));
-  const _STEPS_PER_SEG = Math.max(12, Math.min(60, Math.round(_msPerSeg / 50)));
+  const _msPerSeg = Math.round(15000 / _segCount);
+  const _STEPS_PER_SEG = Math.max(4, Math.min(60, Math.round(_msPerSeg / 50)));
   for (let i = 1; i < path.length; i++) {
     if (this._abortRoute) break;
     const from = path[i-1], to = path[i];
