@@ -676,7 +676,7 @@ function _startAIS() {
     const marker = L.marker([v.lat, v.lng], { icon, zIndexOffset: -100, interactive: true }).addTo(map);
     const label  = L.marker([v.lat, v.lng], {
       icon: L.divIcon({
-        html: `<div style="font-family:Courier New;font-size:10px;color:#aaddff;white-space:nowrap;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none">${v.name.slice(0,15)}</div>`,
+        html: `<div style="font-family:Courier New;font-size:11px;color:#aaddff;white-space:nowrap;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none">${v.name.slice(0,15)}</div>`,
         className: '', iconAnchor: [-6, -4],
       }),
       interactive: false, zIndexOffset: -200,
@@ -687,19 +687,19 @@ function _startAIS() {
       const bars = isBars ? v.interests.map(i => {
         const col = i.s >= 80 ? '#ff8833' : i.s >= 60 ? '#ffdd44' : '#44aacc';
         return `<div style="margin:3px 0">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:1px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px">
             <span style="color:#c0d8e8">${i.c}</span>
             <span style="color:${col};font-weight:bold">${i.s}</span>
           </div>
-          <div style="background:#0d1e2a;border-radius:2px;height:5px;width:100%">
-            <div style="background:${col};width:${i.s}%;height:5px;border-radius:2px"></div>
+          <div style="background:#0d1e2a;border-radius:2px;height:7px;width:100%">
+            <div style="background:${col};width:${i.s}%;height:7px;border-radius:2px"></div>
           </div>
-          <div style="font-size:9px;color:#4a6a8a;margin-top:1px">${i.r}</div>
+          <div style="font-size:11px;color:#6a8aaa;margin-top:2px;margin-bottom:4px">${i.r}</div>
         </div>`;
       }).join('') : '';
-      return `<div style="font-family:Courier New;font-size:11px;color:#c0d8e8;background:#060c12;border:1px solid #2a4a5a;padding:10px 13px;line-height:1.8;min-width:260px;max-width:300px">
-        <div style="color:#fff;font-size:13px;font-weight:bold;margin-bottom:5px">${v.flag} ${v.name}</div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin-bottom:6px">
+      return `<div style="font-family:Courier New;font-size:13px;color:#c0d8e8;background:#060c12;border:1px solid #2a4a5a;padding:14px 16px;line-height:1.9;min-width:320px;max-width:380px">
+        <div style="color:#fff;font-size:16px;font-weight:bold;margin-bottom:8px">${v.flag} ${v.name}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-bottom:8px">
           <span style="color:#4a6a7a">TYPE</span><span>${v.type >= 80 ? 'TANKER / VLCC' : 'CARGO / CONTAINER'}</span>
           <span style="color:#4a6a7a">CARGO</span><span style="color:#ffe080">${v.cargo ?? '—'}</span>
           <span style="color:#4a6a7a">FROM</span><span>${v.origin ?? '—'}</span>
@@ -707,8 +707,8 @@ function _startAIS() {
           <span style="color:#4a6a7a">SPEED</span><span>${v.sog.toFixed(1)} kn · ${v._navDir > 0 ? 'INBOUND' : 'OUTBOUND'}</span>
           <span style="color:#4a6a7a">MMSI</span><span style="color:#4a6a7a">${v.mmsi}</span>
         </div>
-        ${isBars ? `<div style="border-top:1px solid #1a3a4a;padding-top:7px;margin-top:2px">
-          <div style="font-size:9px;letter-spacing:1px;color:#4a7a9a;margin-bottom:5px">STAKEHOLDER INTEREST IN SAFE PASSAGE (0–100)</div>
+        ${isBars ? `<div style="border-top:1px solid #1a3a4a;padding-top:9px;margin-top:2px">
+          <div style="font-size:11px;letter-spacing:1px;color:#4a7a9a;margin-bottom:7px">STAKEHOLDER INTEREST IN SAFE PASSAGE (0–100)</div>
           ${bars}
         </div>` : ''}
         ${(typeof getCategory === 'function' && v.actorCategory) ? (() => {
@@ -724,7 +724,7 @@ function _startAIS() {
       </div>`;
     };
 
-    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 240, closeButton: true });
+    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true });
     _aisVessels.set(v.mmsi, { marker, label, v, makePopup });
   });
 
