@@ -39,18 +39,10 @@ const UNIT_DEFS = [
   { id:'fac4',  name:'IRGC FAC-4',      side:'red', type:'fac',             lat:25.14, lng:53.81 },  // wp7 — mid-strait ambush
   { id:'sub1',  name:'IRS GHADIR-881',  side:'red', type:'submarine',       lat:25.58, lng:54.92 },  // wp6 — silent mid-strait
   { id:'mine1', name:'IRGC MINELAYER',  side:'red', type:'minelayer',       lat:26.45, lng:56.25 },  // TSS entry minefield
-  { id:'batt1', name:'NOOR BATTERY',    side:'red', type:'coastal_battery', lat:27.18, lng:56.40 },
-  { id:'batt2', name:'QESHM BATTERY',   side:'red', type:'coastal_battery', lat:26.608, lng:54.734 },
-  { id:'batt3', name:'BANDAR BATTERY',  side:'red', type:'coastal_battery', lat:27.274, lng:52.954 },
-  { id:'batt4', name:'MUSANDAM BATTERY', side:'red', type:'coastal_battery', lat:25.810, lng:57.353 },
 ];
 
 // Threat zones (real geography)
 const THREAT_ZONES_DEF = [
-  { id:'noor',   label:'NOOR BATTERY  C-802 RANGE',   lat:27.18,  lng:56.40, radiusKm:65, color:'#cc2222', level:0.85 },
-  { id:'qeshm',  label:'QESHM BATTERY  C-802 RANGE',  lat:26.608, lng:54.734, radiusKm:65, color:'#cc2222', level:0.80 },
-  { id:'bandar',   label:'BANDAR BATTERY  C-802 RANGE',   lat:27.274, lng:52.954, radiusKm:65, color:'#cc2222', level:0.80 },
-  { id:'musandam', label:'MUSANDAM BATTERY  C-802 RANGE', lat:25.810, lng:57.353, radiusKm:65, color:'#cc2222', level:0.85 },
 ];
 
 // Invisible trigger zones — when blue units enter, IRGC FAC reinforcements spawn
@@ -263,7 +255,10 @@ function shipSVG(type, side, selected) {
 
 function makeIcon(type, side, selected=false, headingDeg=0) {
   const svg  = shipSVG(type, side, selected);
-  const size = type==='carrier' ? 68 : type==='tanker' ? 60 : type==='fac' ? 36 : type==='coastal_battery' ? 48 : 52;
+  // Blue fleet drawn at half-size for less visual congestion in the strait.
+  // Red units keep original size so they remain readable as threats.
+  const baseSize = type==='carrier' ? 48 : type==='tanker' ? 42 : type==='fac' ? 26 : type==='coastal_battery' ? 34 : 36;
+  const size = side === 'blue' ? Math.round(baseSize / 2) : baseSize;
   return L.divIcon({
     html: `<div class="ship-marker${selected?' ship-selected':''}" title="${type}"
               style="transform:rotate(${headingDeg}deg);transform-origin:center">${svg}</div>`,
@@ -272,6 +267,10 @@ function makeIcon(type, side, selected=false, headingDeg=0) {
     className: '',
   });
 }
+
+// Expose makeIcon so ai-features.js can render OOB units with real ship SVG
+// icons that match the rest of the map.
+if (typeof window !== 'undefined') window.makeIcon = makeIcon;
 
 function _pointInPoly(lat, lng, poly) {
   let inside = false;
@@ -292,6 +291,8 @@ function _isLand(lat, lng) {
   if (lat < 21.50) return true;
   return false;
 }
+// Expose so ai-features.js can snap AI-generated OOB units off land.
+if (typeof window !== 'undefined') window._isLand = _isLand;
 
 function _hasLineOfSight(from, to) {
   const steps = 18;
@@ -401,9 +402,9 @@ export class LeafletGame {
 
     const setMode = (mode) => {
       this._paintMode = this._paintMode === mode ? null : mode;
-      btnPath.classList.toggle('active',     this._paintMode === 'path');
-      btnBoundary.classList.toggle('active', this._paintMode === 'boundary');
-      btnBattery.classList.toggle('active',  this._paintMode === 'battery');
+      if (btnPath)     btnPath.classList.toggle('active',     this._paintMode === 'path');
+      if (btnBoundary) btnBoundary.classList.toggle('active', this._paintMode === 'boundary');
+      if (btnBattery)  btnBattery.classList.toggle('active',  this._paintMode === 'battery');
       if (this._paintMode) {
         this._map.dragging.disable();
         mapEl.style.cursor = 'crosshair';
@@ -413,19 +414,19 @@ export class LeafletGame {
       }
     };
 
-    btnPath.addEventListener('click',     () => setMode('path'));
-    btnBoundary.addEventListener('click', () => setMode('boundary'));
-    btnBattery.addEventListener('click',  () => setMode('battery'));
+    if (btnPath)     btnPath.addEventListener('click',     () => setMode('path'));
+    if (btnBoundary) btnBoundary.addEventListener('click', () => setMode('boundary'));
+    if (btnBattery)  btnBattery.addEventListener('click',  () => setMode('battery'));
 
-    btnClear.addEventListener('click', () => {
+    if (btnClear) btnClear.addEventListener('click', () => {
       this._paintLines.forEach(l => this._map.removeLayer(l));
       this._paintLines = [];
       this._activeLine = null;
       this._paintPoints = [];
       this._batteryPins.forEach(m => this._map.removeLayer(m));
       this._batteryPins = [];
-      coordEl.style.display = 'none';
-      btnClear.style.display = 'none';
+      if (coordEl)  coordEl.style.display = 'none';
+      if (btnClear) btnClear.style.display = 'none';
     });
 
     coordEl.addEventListener('click', () => {
@@ -510,6 +511,15 @@ export class LeafletGame {
     mapEl.addEventListener('mousedown',  onDown);
     mapEl.addEventListener('mousemove',  onMove);
     mapEl.addEventListener('mouseup',    onUp);
+    // Expose the latest painted path on the instance so external code can use it
+    this._lastPaintedPath = null;
+    const origUp = onUp;
+    // (onUp already runs above; we just stash the result after it finishes)
+    mapEl.addEventListener('mouseup', () => {
+      if (this._paintMode === 'path' && this._paintPoints && this._paintPoints.length >= 2) {
+        this._lastPaintedPath = this._paintPoints.slice();
+      }
+    });
     mapEl.addEventListener('touchstart', onDown,  { passive: true });
     mapEl.addEventListener('touchmove',  onMove,  { passive: true });
     mapEl.addEventListener('touchend',   onUp);
@@ -528,6 +538,11 @@ export class LeafletGame {
         destroyed: false,
         heading: def.side === 'blue' ? 212 : 0,
         _heading: def.side === 'blue' ? 212 : 0,
+        _origLat: def.lat,
+        _origLng: def.lng,
+        _origType: def.type,
+        _origSide: def.side,
+        _origHeading: def.side === 'blue' ? 212 : 0,
       };
 
       const marker = L.marker([def.lat, def.lng], {
@@ -1961,3 +1976,729 @@ export class LeafletGame {
 
 // ── Module-level sleep ────────────────────────────────────────────────────────
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── War-risk insurance bump helper. Called when red fires, blue counter-fires,
+// or anything kinetic happens during transit. Pushes delta into the active
+// exercise if one is running, otherwise into a live-override so the idle
+// state strip still reflects the spike. Re-syncs the legacy state strip.
+function _bumpWarRisk(deltaBps, opts = {}) {
+  if (typeof window === 'undefined') return;
+  if (window.activeExercise && !window.activeExercise.complete && typeof window.activeExercise.applyDelta === 'function') {
+    window.activeExercise.applyDelta({ warRiskInsurance: deltaBps });
+    if (opts.escalationRung && typeof window.activeExercise.applyDelta === 'function') {
+      window.activeExercise.applyDelta({ escalationRung: opts.escalationRung });
+    }
+  } else {
+    window._liveInsuranceDelta = (window._liveInsuranceDelta || 0) + deltaBps;
+  }
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  if (typeof window.renderIndicators === 'function') window.renderIndicators();
+}
+
+// ── Stacking transit-log: single container so banners don't overlap ──────────
+function _transitLog(html, accent = '#44ccff', dwellMs = 10000) {
+  // Bottom toasts are disabled — alerts go ONLY to the persistent left-side activity log
+  // so they don't stack and block the map view during transit simulations.
+  _activityLogAppend(html, accent);
+}
+
+function _activityLogAppend(html, accent = '#44ccff') {
+  let panel = document.getElementById('activity-log-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'activity-log-panel';
+    panel.style.cssText = 'position:fixed;top:80px;left:12px;z-index:55;width:340px;max-height:calc(100vh - 280px);overflow-y:auto;background:rgba(0,8,16,0.94);border:1px solid #44ccff66;border-left:4px solid #44ccff;color:#cce0ff;font-family:Courier New,monospace;font-size:10px;line-height:1.4;box-shadow:0 4px 18px rgba(0,0,0,0.7);display:none;flex-direction:column';
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(68,204,255,0.10);border-bottom:1px solid #44ccff44;flex-shrink:0;gap:6px">
+        <div style="color:#44ccff;font-size:10px;letter-spacing:2px;font-weight:bold;flex:1">⚓ ACTIVITY LOG</div>
+        <button id="activity-log-min" title="Minimize / expand" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 8px;cursor:pointer;font-family:inherit;font-size:11px">▾</button>
+        <button id="activity-log-clear" title="Clear all entries" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 8px;cursor:pointer;font-family:inherit;font-size:10px;letter-spacing:1px">CLEAR</button>
+        <button id="activity-log-close" title="Close panel" style="background:none;border:1px solid #44ccff66;color:#44ccff;padding:1px 7px;cursor:pointer;font-family:inherit;font-size:11px">✕</button>
+      </div>
+      <div id="activity-log-body" style="flex:1;overflow-y:auto;padding:6px 10px"></div>`;
+    document.body.appendChild(panel);
+    const closeBtn = document.getElementById('activity-log-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+    const clearBtn = document.getElementById('activity-log-clear');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      const b = document.getElementById('activity-log-body');
+      if (b) b.innerHTML = '';
+    });
+    const minBtn = document.getElementById('activity-log-min');
+    if (minBtn) minBtn.addEventListener('click', () => {
+      const b = document.getElementById('activity-log-body');
+      if (!b) return;
+      const collapsed = b.style.display === 'none';
+      b.style.display = collapsed ? '' : 'none';
+      minBtn.textContent = collapsed ? '▾' : '▴';
+    });
+  }
+  panel.style.display = 'flex';
+  const body = document.getElementById('activity-log-body');
+  if (!body) return;
+  const t = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const row = document.createElement('div');
+  row.style.cssText = `border-left:2px solid ${accent}88;padding:4px 8px;margin-bottom:4px;background:rgba(255,255,255,0.02)`;
+  row.innerHTML = `<div style="color:${accent};font-size:9px;letter-spacing:1.5px">${t}</div><div style="color:#cce0ff;font-size:10px;margin-top:1px">${html}</div>`;
+  body.insertBefore(row, body.firstChild);
+}
+
+if (typeof window !== 'undefined') {
+  window._activityLogAppend = _activityLogAppend;
+  window._activityLogClear = () => {
+    const body = document.getElementById('activity-log-body');
+    if (body) body.innerHTML = '';
+    const panel = document.getElementById('activity-log-panel');
+    if (panel) panel.style.display = 'none';
+  };
+}
+
+// ── Destroyer sweep + engagement helpers (used by executePaintedRoute) ───────
+LeafletGame.prototype._sweepMine = function (mine) {
+  const map = this._map;
+  // Detonation flash
+  const flashIcon = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:30px;animation:fxBoom 1.2s ease-out forwards;text-shadow:0 0 20px #44ccff">💥</div>', iconSize:[30,30] });
+  const fx = L.marker([mine.lat, mine.lng], { icon: flashIcon, interactive: false, zIndexOffset: 800 }).addTo(map);
+  setTimeout(() => map.removeLayer(fx), 1500);
+  // Remove the mine marker + its kill-radius ring
+  if (mine.marker) map.removeLayer(mine.marker);
+  if (mine.ring)   map.removeLayer(mine.ring);
+  _transitLog(`<span style="color:#44ccff">⚓ MINE NEUTRALIZED</span> · ${mine.label || 'IRGC LIMPET'} · MCM sweep complete`, '#44ccff', 3000);
+  if (this._combatState) _logAarEvent(this._combatState, { type: 'mine_sweep', label: mine.label || 'IRGC LIMPET' });
+};
+
+LeafletGame.prototype._engageFac = function (fac) {
+  if (fac.destroyed) return;
+  fac.destroyed = true;
+  const map = this._map;
+  const ll = fac.marker ? fac.marker.getLatLng() : null;
+  if (!ll) return;
+  // Explosion at FAC location
+  const flashIcon = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:42px;animation:fxBoom 1.5s ease-out forwards;text-shadow:0 0 22px #ff3300">💥</div>', iconSize:[42,42] });
+  const fx = L.marker([ll.lat, ll.lng], { icon: flashIcon, interactive: false, zIndexOffset: 800 }).addTo(map);
+  setTimeout(() => map.removeLayer(fx), 1800);
+  // Wreck icon
+  const wreck = L.divIcon({ className:'fx-wreck', html:'<div style="font-size:18px;color:#444;text-shadow:0 0 4px #000">⊗</div>', iconSize:[20,20] });
+  L.marker([ll.lat, ll.lng], { icon: wreck, interactive: false }).addTo(map);
+  // Remove FAC marker
+  if (fac.marker) map.removeLayer(fac.marker);
+  _transitLog(`<span style="color:#ff8844">⚔ ${fac.name} NEUTRALIZED</span> · DDG engaged with naval gunfire / ESSM`, '#ff8844', 3500);
+  _bumpWarRisk(40);
+  if (this._combatState) _logAarEvent(this._combatState, { type: 'fac_kill', fac: fac.name });
+};
+
+// Land checks reuse the module-level `_isLand` defined near the top of the file.
+
+// ── Spawn adversaries: drop a randomized cohort of red units (Monte-Carlo roll)
+// All spawned units integrate with _redCombatStep so they pursue + fire during
+// painted-route execution. Each click = a fresh probabilistic roll.
+LeafletGame.prototype.spawnAdversaries = function (opts = {}) {
+  // Water-only anchor points (verified — all in open water, away from islands & coast).
+  // Spawn position = anchor + small random jitter (±0.07° ≈ ±8km), so spawns can't
+  // drift onto Qeshm, Larak, Abu Musa, the Tunbs, or the Iranian/Omani coasts.
+  const SPAWN_ANCHORS = [
+    [25.50, 57.50],  // Gulf of Oman entry
+    [26.20, 56.40],  // TSS westbound lane south of Larak
+    [25.80, 56.20],  // mid-strait open water
+    [25.65, 55.30],  // south of Abu Musa
+    [25.50, 54.50],  // south Persian Gulf approach
+    [26.25, 53.80],  // central Persian Gulf
+    [26.30, 53.00],  // western Persian Gulf
+    [26.40, 52.20],  // far west, clear water
+  ];
+  const JITTER = 0.07;  // ~8km variance — enough to scatter, never enough to hit land
+  const cohortSize = opts.size || (3 + Math.floor(Math.random() * 4));  // 3-6
+  const types = ['fac', 'fac', 'fac', 'fac', 'submarine', 'minelayer'];  // FACs weighted high
+  const rollNum = (this._spawnRolls || 0) + 1;
+  this._spawnRolls = rollNum;
+
+  for (let i = 0; i < cohortSize; i++) {
+    const anchor = SPAWN_ANCHORS[Math.floor(Math.random() * SPAWN_ANCHORS.length)];
+    const lat = anchor[0] + (Math.random() * 2 - 1) * JITTER;
+    const lng = anchor[1] + (Math.random() * 2 - 1) * JITTER;
+    const type = types[Math.floor(Math.random() * types.length)];
+    const id = `spawn-${rollNum}-${i}-${Date.now()}`;
+    const namePrefix = type === 'submarine' ? 'IRS' : type === 'minelayer' ? 'IRGC ML' : 'IRGC FAC';
+    const unit = {
+      id, name: `${namePrefix}-${rollNum}.${i+1}`, side:'red', type,
+      lat, lng,
+      marker: null,
+      health: { fac: 80, submarine: 100, minelayer: 80 }[type] ?? 80,
+      actionsLeft: 6,
+      destroyed: false,
+      heading: 0,
+      _heading: 0,
+      _origLat: lat,
+      _origLng: lng,
+      _origType: type,
+      _origSide: 'red',
+      _origHeading: 0,
+      _spawned: true,
+    };
+    const marker = L.marker([lat, lng], {
+      icon: makeIcon(type, 'red', false, 0),
+      zIndexOffset: 50,
+    }).addTo(this._map);
+    marker.on('click', (e) => { L.DomEvent.stopPropagation(e); this._selectUnit(unit); });
+    unit.marker = marker;
+    this._units.push(unit);
+  }
+  if (typeof _transitLog === 'function') {
+    _transitLog(`<span style="color:#ff5566">🎲 ROLL #${rollNum} · ${cohortSize} ADVERSARIES SPAWNED</span> · Monte-Carlo cohort active — they will pursue & engage during transit`, '#ff5566', 4500);
+  }
+};
+
+LeafletGame.prototype.clearSpawnedAdversaries = function () {
+  const before = this._units.length;
+  this._units = this._units.filter(u => {
+    if (u._spawned) { if (u.marker) this._map.removeLayer(u.marker); return false; }
+    return true;
+  });
+  const removed = before - this._units.length;
+  if (typeof _transitLog === 'function' && removed > 0) {
+    _transitLog(`<span style="color:#88ddff">✕ CLEARED ${removed} SPAWNED ADVERSARIES</span> · Map reset to baseline IRGC order of battle`, '#88ddff', 3000);
+  }
+};
+
+// ── Red AI: FACs + sub pursue and engage Blue during painted-route transit ──
+LeafletGame.prototype._redCombatStep = async function (bluePositions) {
+  if (!this._combatState) this._combatState = { shotsFiredBy: {}, turnsSinceShot: {}, totalShots: 0, doctrine: null };
+  const state = this._combatState;
+  // Doctrine baseline (overridden once Blue picks a response on first engagement)
+  const DOCTRINE = {
+    null:             { facFireChance: 0.25, facMaxShots: 3, facCooldown: 6, subFireChance: 0.18 },
+    ESCALATE:         { facFireChance: 0.55, facMaxShots: 5, facCooldown: 4, subFireChance: 0.30 }, // Iran retaliates aggressively
+    ACTIVE_DEFENSE:   { facFireChance: 0.30, facMaxShots: 3, facCooldown: 6, subFireChance: 0.18 }, // Iran tests resolve, slight increase
+    HAIL:             { facFireChance: 0.45, facMaxShots: 4, facCooldown: 5, subFireChance: 0.22 }, // Iran reads weakness, pushes harder
+    BREAK:            { facFireChance: 0,    facMaxShots: 0, facCooldown: 99, subFireChance: 0 },   // Iran wins, ceases fire
+  };
+  const D = DOCTRINE[state.doctrine] || DOCTRINE[null];
+  const MAX_TOTAL_SHOTS = D.facMaxShots;
+  const haver = (a, b) => {
+    const R = 6371, dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+    const lat1 = a.lat*Math.PI/180, lat2 = b.lat*Math.PI/180;
+    const x = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+  const reds = this._units.filter(u => !u.destroyed && u.side === 'red' && u.marker);
+  for (const r of reds) {
+    const rLL = r.marker.getLatLng();
+    let nearest = null, ndist = Infinity;
+    for (const bp of bluePositions) {
+      const d = haver(rLL, bp.ll);
+      if (d < ndist) { ndist = d; nearest = bp; }
+    }
+    if (!nearest) continue;
+
+    if (r.type === 'fac') {
+      // Pursue Blue from far out — FACs will sortie when Blue is within 250km
+      if (ndist < 250 && ndist > 6) {
+        const dLat = nearest.ll.lat - rLL.lat;
+        const dLng = nearest.ll.lng - rLL.lng;
+        const mag = Math.hypot(dLat, dLng) || 1;
+        const stepDeg = 0.022;  // ~2.4km/step at 100ms — fast attack craft sprint
+        let nLat = rLL.lat + dLat/mag * stepDeg;
+        let nLng = rLL.lng + dLng/mag * stepDeg;
+        // Land-avoidance: if direct step hits land, try sliding 90° port then 90° stbd
+        // along the coastline to navigate around islands.
+        if (_isLand(nLat, nLng)) {
+          const perpLat = -dLng/mag * stepDeg;
+          const perpLng =  dLat/mag * stepDeg;
+          const portLat = rLL.lat + perpLat, portLng = rLL.lng + perpLng;
+          const stbdLat = rLL.lat - perpLat, stbdLng = rLL.lng - perpLng;
+          if (!_isLand(portLat, portLng))      { nLat = portLat; nLng = portLng; }
+          else if (!_isLand(stbdLat, stbdLng)) { nLat = stbdLat; nLng = stbdLng; }
+          else { nLat = rLL.lat; nLng = rLL.lng; }  // both blocked, hold
+        }
+        r.marker.setLatLng([nLat, nLng]);
+        const heading = ((Math.atan2(nLng - rLL.lng, nLat - rLL.lat) * 180/Math.PI) - 90 + 720) % 360;
+        r.marker.setIcon(makeIcon(r.type, 'red', false, heading));
+      }
+      // Fire chance + cap pulled from active doctrine (changes after Blue's response choice).
+      const alreadyShot = !!state.shotsFiredBy[r.id];
+      if (state.totalShots < MAX_TOTAL_SHOTS && !alreadyShot && ndist <= 40 && Math.random() < D.facFireChance) {
+        state.shotsFiredBy[r.id] = 1;
+        state.totalShots += 1;
+        await this._fireRedShot(r, nearest, 0.45, 'C-802 ASCM');
+      }
+    }
+
+    if (r.type === 'submarine') {
+      // Doctrine-driven torpedo chance; one per transit max.
+      const alreadyShot = !!state.shotsFiredBy[r.id];
+      if (state.totalShots < MAX_TOTAL_SHOTS && !alreadyShot && ndist <= 80 && Math.random() < D.subFireChance) {
+        state.shotsFiredBy[r.id] = 1;
+        state.totalShots += 1;
+        await this._fireRedShot(r, nearest, 0.30, 'TYPE-53 TORPEDO');
+      }
+    }
+  }
+};
+
+// ── AAR (After-Action Review): structured debrief shown at transit end.
+function _logAarEvent(state, evt) {
+  if (!state) return;
+  if (!state.aar) state.aar = { events: [], startTime: Date.now() };
+  state.aar.events.push({ t: Date.now() - state.aar.startTime, ...evt });
+  // Dispatch to live escalation ladder so combat events visibly move the rung
+  try {
+    if (typeof window !== 'undefined' && typeof window._bumpLiveEscalation === 'function') {
+      const t = (evt && evt.type) || '';
+      if (t === 'fire')           window._bumpLiveEscalation(+1, 'red fired');
+      else if (t === 'fac_kill')  window._bumpLiveEscalation(+1, 'fac neutralized');
+      else if (t === 'mine_sweep')window._bumpLiveEscalation(+1, 'mine encountered');
+      else if (t === 'sub_kill')  window._bumpLiveEscalation(+2, 'sub neutralized');
+      else if (t === 'hit')       window._bumpLiveEscalation(+2, 'blue ship hit');
+    }
+  } catch (e) {}
+}
+
+function _renderAAR(state, opts = {}) {
+  const modal = document.getElementById('aar-modal');
+  if (!modal || !state || !state.aar) return;
+  const body  = document.getElementById('aar-modal-body');
+  const title = document.getElementById('aar-modal-title');
+
+  const events = state.aar.events;
+  const durSec = Math.round((Date.now() - state.aar.startTime) / 1000);
+
+  const fired   = events.filter(e => e.type === 'fire');
+  const hits    = events.filter(e => e.type === 'hit');
+  const misses  = events.filter(e => e.type === 'miss');
+  const facKills = events.filter(e => e.type === 'fac_kill');
+  const mineSweeps = events.filter(e => e.type === 'mine_sweep');
+  const choices = events.filter(e => e.type === 'choice');
+  const choice  = choices.length ? choices[0].choice : null;
+
+  const aborted = !!opts.aborted;
+  const outcome = aborted ? 'TRANSIT ABORTED — RETREAT EAST' :
+                  hits.length > 0 ? 'TRANSIT COMPLETE — VESSEL HIT, UNDERWAY' :
+                  fired.length > 0 ? 'TRANSIT COMPLETE — ALL ROUNDS DEFEATED' :
+                  'TRANSIT COMPLETE — UNCONTESTED';
+  const outcomeColor = aborted ? '#ff8888' : hits.length > 0 ? '#ffaa44' : '#44cc88';
+  if (title) title.innerHTML = `<span style="color:${outcomeColor}">${outcome}</span>`;
+
+  // Engagement summary
+  const engagementsRows = [];
+  for (const e of fired) {
+    const followup = events.find(x => x.t > e.t && (x.type === 'hit' || x.type === 'miss') && x.weapon === e.weapon);
+    const result = followup ? (followup.type === 'hit' ? '⊠ HIT' : '⛒ CIWS INTERCEPT') : '— resolution pending';
+    const resCol = followup && followup.type === 'hit' ? '#ffaa44' : '#88ddff';
+    engagementsRows.push(
+      `<tr><td style="color:#ff8866;padding:3px 12px 3px 0">${e.attacker}</td>` +
+      `<td style="color:#ffaa44;padding:3px 12px 3px 0">${e.weapon}</td>` +
+      `<td style="color:#88ddff;padding:3px 12px 3px 0">${e.target}</td>` +
+      `<td style="color:${resCol};padding:3px 0">${result}</td></tr>`);
+  }
+  for (const e of mineSweeps) {
+    engagementsRows.push(
+      `<tr><td style="color:#44ccff;padding:3px 12px 3px 0">DDG MCM</td>` +
+      `<td style="color:#44ccff;padding:3px 12px 3px 0">mine sweep</td>` +
+      `<td style="color:#aac;padding:3px 12px 3px 0">${e.label || 'IRGC limpet'}</td>` +
+      `<td style="color:#44ccff;padding:3px 0">⚓ NEUTRALIZED</td></tr>`);
+  }
+  for (const e of facKills) {
+    engagementsRows.push(
+      `<tr><td style="color:#ff8844;padding:3px 12px 3px 0">DDG counter-fire</td>` +
+      `<td style="color:#ff8844;padding:3px 12px 3px 0">ESSM / gunfire</td>` +
+      `<td style="color:#aac;padding:3px 12px 3px 0">${e.fac}</td>` +
+      `<td style="color:#ff8844;padding:3px 0">⊗ NEUTRALIZED</td></tr>`);
+  }
+
+  // Choice summary
+  const choiceLabels = {
+    ESCALATE:        { label: '⚔ ESCALATE — DDG strike on FAC fire-control radar', impl: 'Iran retaliated aggressively next-turn (FAC fire chance ↑ to 55%, max-shots ↑ to 5).' },
+    ACTIVE_DEFENSE:  { label: '🛡 ACTIVE DEFENSE — CIWS + chaff, no return fire',  impl: 'Iran tested resolve but did not significantly escalate. Alliance cohesion preserved.' },
+    HAIL:            { label: '📻 HAIL — bridge-to-bridge warning',                impl: 'Iran read posture as weakness; doctrine adapted to push harder (fire chance ↑ to 45%).' },
+    BREAK:           { label: '🔴 BREAK CONTACT — abort transit',                  impl: 'IRGC declared deterrent success. Tehran propaganda likely; insurance still spiked.' },
+    null:            { label: '(no engagement occurred — uncontested transit)',     impl: 'Probabilistic FAC roll yielded no launches. Distribution variance — re-run for different outcome.' },
+  };
+  const choiceInfo = choiceLabels[choice];
+
+  // Indicator deltas (best-effort from window state)
+  const liveDelta = (typeof window !== 'undefined' && window._liveInsuranceDelta) || 0;
+  const insBps = 720 + liveDelta;
+
+  // Observations
+  const observations = [];
+  if (aborted) observations.push({ ico: '🔴', txt: 'Transit aborted — review whether ROE Level 4 (break contact) was the right call given the threat picture. Tehran will read this as a successful coercion.' });
+  if (hits.length > 0) observations.push({ ico: '⚠', txt: `Blue vessel sustained ${hits.length} ${hits.length === 1 ? 'hit' : 'hits'}. Damage was characterized as superficial; vessel remained underway. Lloyd's JWC will likely add 100-200 bps overnight on top of current ${insBps} bps.` });
+  if (fired.length > 0 && hits.length === 0) observations.push({ ico: '✓', txt: `${fired.length} inbound ${fired.length === 1 ? 'round' : 'rounds'} defeated by CIWS / decoys / counter-fire. AEGIS performance validated under MINING-rung threat conditions.` });
+  if (facKills.length > 0) observations.push({ ico: '✓', txt: `${facKills.length} IRGC FAC${facKills.length === 1 ? '' : 's'} neutralized via DDG counter-engagement at ≤15 km. Confirms ESSM + naval gunfire effective vs. Boghammar swarm.` });
+  if (mineSweeps.length > 0) observations.push({ ico: '⚓', txt: `${mineSweeps.length} mine${mineSweeps.length === 1 ? '' : 's'} swept by DDG MCM at ≤5 km — clean transit through the mine field.` });
+  if (choice === 'HAIL') observations.push({ ico: '⚠', txt: 'Hold-fire posture under direct attack creates both diplomatic dividend AND tactical vulnerability — model assumes Iran reads this as weakness, doctrine adapts upward. This may have suppressed alliance cohesion gains.' });
+  if (choice === 'ESCALATE') observations.push({ ico: '⚔', txt: 'ROE Level 3 (active counter-fire on FAC fire-control radar) preserves freedom of navigation but commits the U.S. to a kinetic exchange. Insurance market reaction +80 bps; alliance attribution support critical for Phase 2.' });
+
+  // Doctrine lessons
+  const lessons = [];
+  if (choice === 'ESCALATE') lessons.push('Validates the "active counter-fire under provocation" hypothesis. Escalation rung +1 was paid in exchange for clean transit + FAC neutralization.');
+  if (choice === 'ACTIVE_DEFENSE') lessons.push('"Active defense without retaliation" preserves alliance signaling under MINING rung. CIWS performance should be stress-tested vs. larger ASCM swarm fires.');
+  if (choice === 'HAIL') lessons.push('Bridge-to-bridge hailing under direct fire produced no observed Iranian de-escalation in this run. May warrant retesting under different rung baselines.');
+  if (choice === 'BREAK') lessons.push('Break-contact preserves vessel + crew but cedes the strait politically. Recommend modeling subsequent escort-required cost in dollars vs. one-time war-risk spike.');
+  if (!fired.length && !aborted) lessons.push('Uncontested transit reflects IRGC coverage gap or successful Blue OPSEC. Random FAC fire-roll variance — re-run multiple times to characterize the distribution.');
+
+  body.innerHTML = `
+    <table style="width:100%;font-size:11px;margin-bottom:14px">
+      <tr><td style="color:#446;padding:2px 8px 2px 0;width:140px">DURATION</td><td style="color:#fff">${durSec} seconds (sim)</td></tr>
+      <tr><td style="color:#446;padding:2px 8px 2px 0">FORCE</td><td style="color:#fff">CSG-9 (CVN-76 + CG-62 + DDG-102 + DDG-119) escorting MV PACIFIC LION</td></tr>
+      <tr><td style="color:#446;padding:2px 8px 2px 0">ROUTE</td><td style="color:#fff">East-to-West, ${(state.aar.routePts || 9)} waypoints</td></tr>
+      <tr><td style="color:#446;padding:2px 8px 2px 0">FINAL ESCALATION</td><td style="color:#fff">${insBps >= 1500 ? 'INSURANCE SUSPENDED' : insBps + ' bps war-risk premium'}</td></tr>
+    </table>
+    <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:18px 0 6px 0">═════ ENGAGEMENTS ═════</div>
+    ${engagementsRows.length ?
+      `<table style="width:100%;font-size:11px;margin-bottom:14px"><tbody>${engagementsRows.join('')}</tbody></table>` :
+      `<div style="color:#888;font-style:italic;margin-bottom:14px">No engagements logged.</div>`}
+    <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:14px 0 6px 0">═════ BLUE COMMAND DECISIONS ═════</div>
+    <div style="background:rgba(255,170,68,0.08);border-left:3px solid #ffaa44;padding:8px 12px;margin-bottom:14px">
+      <div style="color:#ffaa44;font-weight:bold;margin-bottom:3px">${choiceInfo.label}</div>
+      <div style="color:#aac;font-size:11px">${choiceInfo.impl}</div>
+    </div>
+    <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:14px 0 6px 0">═════ OBSERVATIONS ═════</div>
+    <ul style="list-style:none;padding-left:0;margin:0 0 14px 0">
+      ${observations.length ? observations.map(o => `<li style="padding:4px 0;color:#cce0ff"><span style="color:#ffaa44">${o.ico}</span> &nbsp; ${o.txt}</li>`).join('') :
+        `<li style="padding:4px 0;color:#888;font-style:italic">No notable observations.</li>`}
+    </ul>
+    <div style="color:#88a0b8;font-size:10px;letter-spacing:2px;margin:14px 0 6px 0">═════ DOCTRINE LESSONS ═════</div>
+    <ul style="list-style:none;padding-left:0;margin:0">
+      ${lessons.length ? lessons.map(l => `<li style="padding:4px 0;color:#cce0ff"><span style="color:#44cc88">▸</span> &nbsp; ${l}</li>`).join('') :
+        `<li style="padding:4px 0;color:#888;font-style:italic">—</li>`}
+    </ul>
+    <div style="margin-top:18px;padding-top:10px;border-top:1px solid #44cc8844;font-size:9px;letter-spacing:1.5px;color:#446;text-align:right">
+      AAR generated automatically · all events logged from probabilistic Red AI + Blue command decisions · ready for Phase 2 review
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+// ── Response modal: pause transit on first Red fire, await Blue's decision.
+// Returns a Promise<choice> where choice ∈ {ESCALATE, ACTIVE_DEFENSE, HAIL, BREAK}.
+function _showResponseModal(attackerName, weapon, targetName) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('response-modal');
+    if (!modal) { resolve('ACTIVE_DEFENSE'); return; }
+    const body = document.getElementById('response-modal-body');
+    const opts = document.getElementById('response-modal-options');
+    body.innerHTML =
+      `<span style="color:#ff8866">${attackerName}</span> has fired ` +
+      `<span style="color:#ffaa44">${weapon}</span> at ` +
+      `<span style="color:#88ddff">${targetName}</span>.<br>` +
+      `Inbound · CIWS / EW / counter-fire decisions pending command authority.`;
+    const choices = [
+      { id:'ESCALATE',       lbl:'⚔ ESCALATE — DDG strikes FAC fire-control radar', sub:'ROE Level 3 · attribution unambiguous · escalation +1', col:'#ff5566' },
+      { id:'ACTIVE_DEFENSE', lbl:'🛡 ACTIVE DEFENSE — CIWS + chaff, no return fire', sub:'ROE Level 2 · proportional · alliance cohesion +5', col:'#44ddff' },
+      { id:'HAIL',           lbl:'📻 HAIL — bridge-to-bridge warning, hold fire', sub:'ROE Level 1 · de-escalation attempt · attribution +5', col:'#ffaa44' },
+      { id:'BREAK',          lbl:'🔴 BREAK CONTACT — abort transit, retreat east', sub:'Mission failure · oil price +6 · IRGC perception of deterrent success', col:'#888' },
+    ];
+    opts.innerHTML = '';
+    for (const c of choices) {
+      const btn = document.createElement('button');
+      btn.style.cssText = `text-align:left;background:rgba(8,16,28,0.95);border:1px solid ${c.col}66;border-left:3px solid ${c.col};color:#fff;padding:10px 14px;cursor:pointer;font-family:'Courier New',monospace;font-size:13px;line-height:1.4`;
+      btn.innerHTML = `<div style="color:${c.col}">${c.lbl}</div><div style="color:#88a;font-size:10px;margin-top:3px;letter-spacing:1px">${c.sub}</div>`;
+      btn.onmouseenter = () => { btn.style.background = `rgba(${parseInt(c.col.slice(1,3),16)},${parseInt(c.col.slice(3,5),16)},${parseInt(c.col.slice(5,7),16)},0.18)`; };
+      btn.onmouseleave = () => { btn.style.background = 'rgba(8,16,28,0.95)'; };
+      btn.onclick = () => {
+        modal.style.display = 'none';
+        resolve(c.id);
+      };
+      opts.appendChild(btn);
+    }
+    modal.style.display = 'flex';
+  });
+}
+
+LeafletGame.prototype._fireRedShot = async function (attacker, target, hitChance, weapon) {
+  const map = this._map;
+  const aLL = attacker.marker.getLatLng();
+  const tLL = target.ll;
+  const tracer = L.polyline([[aLL.lat, aLL.lng], [tLL.lat, tLL.lng]], {
+    color: '#ff3344', weight: 2, opacity: 0.85, dashArray: '4 4', interactive: false
+  }).addTo(map);
+  setTimeout(() => map.removeLayer(tracer), 1200);
+
+  _transitLog(`<span style="color:#ff5566">⚠ ${attacker.name} FIRING</span> · ${weapon} INBOUND ON ${target.unit.name}`, '#ff5566', 4000);
+  _bumpWarRisk(120, { escalationRung: 1 });
+  _logAarEvent(this._combatState, { type: 'fire', attacker: attacker.name, weapon, target: target.unit.name });
+
+  // First Red fire of the transit → freeze and ask Blue what to do.
+  // Blue's choice modifies doctrine for the rest of the transit AND the
+  // outcome of THIS specific shot (CIWS intercept, return fire, abort, etc.)
+  let blueChoice = this._combatState.doctrine;
+  if (!this._combatState.doctrine) {
+    blueChoice = await _showResponseModal(attacker.name, weapon, target.unit.name);
+    this._combatState.doctrine = blueChoice;
+    _logAarEvent(this._combatState, { type: 'choice', choice: blueChoice });
+    _applyResponseEffects(blueChoice, this);
+  }
+
+  // Resolve hit/miss, biased by Blue's response choice
+  let effectiveHitChance = hitChance;
+  if (blueChoice === 'ESCALATE')       effectiveHitChance = 0.20;  // proactive radar strike + active defense
+  else if (blueChoice === 'ACTIVE_DEFENSE') effectiveHitChance = 0.25;  // CIWS biased toward intercept
+  else if (blueChoice === 'HAIL')      effectiveHitChance = 0.55;  // hold-fire posture exposes vessel
+  else if (blueChoice === 'BREAK')     effectiveHitChance = 0.10;  // breaking eastward opens the angle, lower hit chance
+  const hit = Math.random() < effectiveHitChance;
+
+  setTimeout(() => {
+    if (hit) {
+      const flash = L.divIcon({ className:'fx-explosion', html:'<div style="font-size:30px;animation:fxBoom 1.4s ease-out forwards;text-shadow:0 0 20px #ff3300">💥</div>', iconSize:[30,30] });
+      const fx = L.marker([tLL.lat, tLL.lng], { icon: flash, interactive: false, zIndexOffset: 800 }).addTo(map);
+      setTimeout(() => map.removeLayer(fx), 1600);
+      _transitLog(`<span style="color:#ffaa44">⊠ ${target.unit.name} HIT</span> · ${weapon} from ${attacker.name} · superficial damage, vessel underway`, '#ffaa44', 4500);
+      _bumpWarRisk(450, { escalationRung: 1 });
+      _logAarEvent(this._combatState, { type: 'hit', target: target.unit.name, attacker: attacker.name, weapon });
+    } else {
+      _transitLog(`<span style="color:#88ddff">⛒ CIWS INTERCEPT</span> · ${weapon} from ${attacker.name} defeated · ${target.unit.name} unharmed`, '#88ddff', 3500);
+      _logAarEvent(this._combatState, { type: 'miss', target: target.unit.name, attacker: attacker.name, weapon });
+    }
+  }, 1100);
+
+  // ESCALATE response: DDG immediately strikes the firing FAC's fire-control radar
+  if (blueChoice === 'ESCALATE' && attacker.type === 'fac' && !attacker.destroyed) {
+    setTimeout(() => this._engageFac(attacker), 1500);
+  }
+};
+
+// Apply Blue's chosen response: indicator deltas, transit-log entry, doctrine
+// changes, and (for BREAK CONTACT) abort the transit.
+function _applyResponseEffects(choice, game) {
+  const messages = {
+    ESCALATE:       { txt: '⚔ BLUE ESCALATES — DDG fires SM-2 at FAC fire-control radar. Iran retaliates aggressively next.', col: '#ff5566' },
+    ACTIVE_DEFENSE: { txt: '🛡 ACTIVE DEFENSE — CIWS engaged, chaff deployed. Proportional posture preserved.',                col: '#44ddff' },
+    HAIL:           { txt: '📻 BRIDGE HAIL — warning broadcast on 16/13. Iran perceives weakness, pushes harder.',           col: '#ffaa44' },
+    BREAK:          { txt: '🔴 BREAK CONTACT — formation reverses east. IRGC declares deterrent success.',                    col: '#888' },
+  };
+  const m = messages[choice] || messages.ACTIVE_DEFENSE;
+  if (typeof _transitLog === 'function') _transitLog(`<span style="color:${m.col}">${m.txt}</span>`, m.col, 9000);
+
+  if (choice === 'ESCALATE') {
+    _bumpWarRisk(80,  { escalationRung: 1 });
+  } else if (choice === 'ACTIVE_DEFENSE') {
+    if (window.activeExercise && typeof window.activeExercise.applyDelta === 'function') {
+      window.activeExercise.applyDelta({ allianceCohesion: 5, attributionConfidence: 3 });
+    }
+  } else if (choice === 'HAIL') {
+    if (window.activeExercise && typeof window.activeExercise.applyDelta === 'function') {
+      window.activeExercise.applyDelta({ attributionConfidence: 5, iranCoercion: 3 });
+    }
+  } else if (choice === 'BREAK') {
+    _bumpWarRisk(60);
+    // Abort transit: signal the route loop to break out
+    if (game) game._abortRoute = true;
+  }
+  if (typeof window !== 'undefined' && typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+}
+
+// ── Painted-route execution: tanker + 2 escort DDGs follow the painted path ──
+// Accepts opts.path to override (caller can pass a default route if no painted path exists)
+LeafletGame.prototype.executePaintedRoute = async function (opts = {}) {
+  let path = (opts && opts.path && opts.path.length >= 2)
+    ? opts.path
+    : ((this._lastPaintedPath && this._lastPaintedPath.length >= 2) ? this._lastPaintedPath : null);
+  if (!path) {
+    if (this._emit) this._emit('info', 'No painted path. Use the PATH paint tool first.');
+    return;
+  }
+  if (this._routeRunning) return;
+  this._routeRunning = true;
+  this._abortRoute = false;
+  this._combatState = { shotsFiredBy: {}, turnsSinceShot: {}, totalShots: 0, doctrine: null,
+                        aar: { events: [], startTime: Date.now(), routePts: 0 } };
+
+  const tanker = this._units.find(u => u.id === 'tanker1');
+  const ddgL   = this._units.find(u => u.id === 'ddg102');
+  const ddgR   = this._units.find(u => u.id === 'ddg119');
+  const cruiser= this._units.find(u => u.id === 'cg62');
+  const carrier= this._units.find(u => u.id === 'cvn76');
+  if (!tanker || !ddgL || !ddgR) { this._routeRunning = false; return; }
+
+  const offsetDeg = 0.40; // ~44km lateral spacing — visibly separated at zoom 7-8
+
+  // Single-file column formation, all on the painted path centerline so no
+  // ship cuts across land at any segment. Order from front to rear:
+  //   TANKER (lead, on path)
+  //   ddgR (forward escort, slight starboard offset, -22km astern)
+  //   cruiser (~50km astern, centerline)
+  //   carrier (~78km astern, centerline)
+  //   ddgL (TRAILING the carrier — ~105km astern, centerline)
+  const seg0 = [path[1][0] - path[0][0], path[1][1] - path[0][1]];
+  const seg0mag = Math.hypot(seg0[0], seg0[1]) || 1;
+  const perp0Lat = -seg0[1] / seg0mag * offsetDeg;        // ±20km lateral (ddgR only)
+  const perp0Lng =  seg0[0] / seg0mag * offsetDeg;
+  const trailLat = -seg0[0] / seg0mag * 0.20;              // -22km astern (ddgR)
+  const trailLng = -seg0[1] / seg0mag * 0.20;
+  const aftLat   = -seg0[0] / seg0mag * 0.45;              // -50km astern (cruiser)
+  const aftLng   = -seg0[1] / seg0mag * 0.45;
+  const deepLat  = -seg0[0] / seg0mag * 0.70;              // -78km astern (carrier)
+  const deepLng  = -seg0[1] / seg0mag * 0.70;
+  const tailLat  = -seg0[0] / seg0mag * 0.95;              // -105km astern (ddgL trailing)
+  const tailLng  = -seg0[1] / seg0mag * 0.95;
+  const start = path[0];
+  if (tanker.marker)  tanker.marker.setLatLng(start);
+  if (ddgR.marker)    ddgR.marker.setLatLng([start[0] + perp0Lat + trailLat, start[1] + perp0Lng + trailLng]);
+  if (cruiser && cruiser.marker) cruiser.marker.setLatLng([start[0] + aftLat, start[1] + aftLng]);
+  if (carrier && carrier.marker) carrier.marker.setLatLng([start[0] + deepLat, start[1] + deepLng]);
+  if (ddgL.marker)    ddgL.marker.setLatLng([start[0] + tailLat, start[1] + tailLng]);
+
+  // Fit map to the entire route so everything is visible from the start
+  const bounds = L.latLngBounds(path);
+  this._map.fitBounds(bounds, { padding: [80, 80], maxZoom: 7 });
+  await _sleep(1000);
+
+  // Draw the planned route line in cyan + a moving trail behind tanker in green
+  const plannedLine = L.polyline(path, { color: '#88ccff', weight: 2, opacity: 0.6, dashArray: '5 6', interactive: false }).addTo(this._map);
+  const trail = L.polyline([], { color: '#44cc88', weight: 3, opacity: 0.85, interactive: false }).addTo(this._map);
+  // Register so RESET can clean these up
+  if (typeof window !== 'undefined') {
+    window._transitPolylines = window._transitPolylines || [];
+    window._transitPolylines.push(plannedLine, trail);
+  }
+  let trailPts = [start];
+
+  const triggered = new Set();
+  const incidents = (typeof window !== 'undefined' && window.HISTORICAL_INCIDENTS) || [];
+  const haversineKm = (a, b) => {
+    const R = 6371, dLat = (b[0]-a[0])*Math.PI/180, dLng = (b[1]-a[1])*Math.PI/180;
+    const lat1 = a[0]*Math.PI/180, lat2 = b[0]*Math.PI/180;
+    const x = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+
+  // Compute escort offset perpendicular to current segment direction
+  const PROX_KM = 90;
+  // Decimate dense painted paths to ~40 waypoints so total animation stays bounded.
+  // Drawing with the paint tool can produce hundreds of mouse-move points; we don't
+  // need that many to render a smooth route at viewing zoom.
+  const TARGET_PTS = 40;
+  if (path.length > TARGET_PTS) {
+    const stride = Math.ceil(path.length / TARGET_PTS);
+    const decimated = [];
+    for (let k = 0; k < path.length; k += stride) decimated.push(path[k]);
+    if (decimated[decimated.length - 1] !== path[path.length - 1]) decimated.push(path[path.length - 1]);
+    path = decimated;
+  }
+  // Adaptive total animation time. Target ~15s. Per-segment STEPS clamped [4, 60].
+  const _segCount = Math.max(1, path.length - 1);
+  const _msPerSeg = Math.round(15000 / _segCount);
+  const _STEPS_PER_SEG = Math.max(4, Math.min(60, Math.round(_msPerSeg / 50)));
+  for (let i = 1; i < path.length; i++) {
+    if (this._abortRoute) break;
+    const from = path[i-1], to = path[i];
+    const dLat = to[0] - from[0], dLng = to[1] - from[1];
+    const mag = Math.hypot(dLat, dLng) || 1;
+    const perpLat = -dLng / mag * offsetDeg;
+    const perpLng =  dLat / mag * offsetDeg;
+    // Trail offset (escorts ride 10km astern of the tanker)
+    const trailLatSeg = -dLat / mag * 0.20;
+    const trailLngSeg = -dLng / mag * 0.20;
+    // Ship SVGs are drawn with bow pointing EAST (x=+30 hull tip). Navigation bearing
+    // is from north. So CSS-rotate by (bearing - 90) to align bow with direction of travel.
+    const headingDeg = ((Math.atan2(dLng, dLat) * 180 / Math.PI) - 90 + 720) % 360;
+    if (tanker.marker)              tanker.marker.setIcon(makeIcon(tanker.type, 'blue', false, headingDeg));
+    if (ddgL.marker)                ddgL.marker.setIcon(makeIcon(ddgL.type,    'blue', false, headingDeg));
+    if (ddgR.marker)                ddgR.marker.setIcon(makeIcon(ddgR.type,    'blue', false, headingDeg));
+    if (cruiser && cruiser.marker)  cruiser.marker.setIcon(makeIcon(cruiser.type,'blue', false, headingDeg));
+    if (carrier && carrier.marker)  carrier.marker.setIcon(makeIcon(carrier.type,'blue', false, headingDeg));
+    const STEPS = _STEPS_PER_SEG;
+    for (let s = 1; s <= STEPS; s++) {
+      const t = s / STEPS;
+      const lat = from[0] + dLat * t;
+      const lng = from[1] + dLng * t;
+      // Per-segment offsets — column formation, all on the path centerline
+      const aftLatSeg  = -dLat / mag * 0.45;            // -50km astern (cruiser)
+      const aftLngSeg  = -dLng / mag * 0.45;
+      const deepLatSeg = -dLat / mag * 0.70;            // -78km astern (carrier)
+      const deepLngSeg = -dLng / mag * 0.70;
+      const tailLatSeg = -dLat / mag * 0.95;            // -105km astern (ddgL — trails carrier)
+      const tailLngSeg = -dLng / mag * 0.95;
+      if (tanker.marker)              tanker.marker.setLatLng([lat, lng]);
+      if (ddgR.marker)                ddgR.marker.setLatLng([lat + perpLat + trailLatSeg, lng + perpLng + trailLngSeg]);
+      if (cruiser && cruiser.marker)  cruiser.marker.setLatLng([lat + aftLatSeg, lng + aftLngSeg]);
+      if (carrier && carrier.marker)  carrier.marker.setLatLng([lat + deepLatSeg, lng + deepLngSeg]);
+      if (ddgL.marker)                ddgL.marker.setLatLng([lat + tailLatSeg, lng + tailLngSeg]);
+
+      // ── Mine sweep + FAC engagement: destroyers kill mines (≤5km) and IRGC FACs (≤15km)
+      const ddgPositions = [ddgL, ddgR].filter(d => d && d.marker).map(d => d.marker.getLatLng());
+      // Sweep mines
+      if (window._activeMines && window._activeMines.length > 0) {
+        for (let mi = window._activeMines.length - 1; mi >= 0; mi--) {
+          const mine = window._activeMines[mi];
+          const closest = Math.min(...ddgPositions.map(p => haversineKm([p.lat, p.lng], [mine.lat, mine.lng])));
+          if (closest <= 5) {
+            this._sweepMine(mine);
+            window._activeMines.splice(mi, 1);
+          }
+        }
+      }
+      // Red AI: FACs pursue and fire ASCMs at Blue, sub fires torpedoes.
+      // _redCombatStep is async because the FIRST shot pauses for Blue's
+      // response decision (modal). Subsequent shots use the chosen doctrine.
+      const blueUnitsLive = [tanker, ddgL, ddgR, cruiser, carrier].filter(u => u && u.marker);
+      const bluePositions = blueUnitsLive.map(u => ({ unit: u, ll: u.marker.getLatLng() }));
+      await this._redCombatStep(bluePositions);
+      if (this._abortRoute) break;
+
+      // DDG counter-engagement: kill FACs that close to ≤15km
+      const facs = this._units.filter(u => !u.destroyed && u.side === 'red' && u.type === 'fac' && u.marker);
+      for (const fac of facs) {
+        const fll = fac.marker.getLatLng();
+        const closest = Math.min(...ddgPositions.map(p => haversineKm([p.lat, p.lng], [fll.lat, fll.lng])));
+        if (closest <= 15) {
+          this._engageFac(fac);
+        }
+      }
+
+      // Append to green trail (every 3rd step to keep it light)
+      if (s % 3 === 0) { trailPts.push([lat, lng]); trail.setLatLngs(trailPts); }
+
+      // SIM_VESSELS follow the NAV_CHANNEL waypoint chain — stays in water
+      // by construction since waypoints are pre-verified water-only. Each ship
+      // advances toward NAV_CHANNEL[_navIdx + _navDir]; on arrival, _navIdx
+      // increments. Once at the end, ship has exited and stops.
+      if (window.SIM_VESSELS && window.NAV_CHANNEL) {
+        const NAV = window.NAV_CHANNEL;
+        const STEP_DEG = 0.012;
+        for (const sv of window.SIM_VESSELS) {
+          if (sv._cleared) continue;
+          const navDir = sv._navDir || 1;
+          const targetIdx = (sv._navIdx ?? 5) + navDir;
+          if (targetIdx < 0 || targetIdx >= NAV.length) continue; // already exited
+          const target = NAV[targetIdx];
+          const baseLat = sv._currentLat ?? sv.lat;
+          const baseLng = sv._currentLng ?? sv.lng;
+          const dLat = target[0] - baseLat;
+          const dLng = target[1] - baseLng;
+          const dist = Math.hypot(dLat, dLng) || 0.0001;
+          let nLat, nLng;
+          if (dist < STEP_DEG) {
+            // arrived at this waypoint — snap and advance to next
+            nLat = target[0]; nLng = target[1];
+            sv._navIdx = targetIdx;
+          } else {
+            nLat = baseLat + (dLat / dist) * STEP_DEG;
+            nLng = baseLng + (dLng / dist) * STEP_DEG;
+          }
+          sv._currentLat = nLat;
+          sv._currentLng = nLng;
+          if (sv._marker) sv._marker.setLatLng([nLat, nLng]);
+          if (sv._label)  sv._label.setLatLng([nLat, nLng]);
+        }
+      }
+      // Recompute OIL AT RISK from updated vessel positions every 10 steps
+      if (s % 10 === 0 && typeof window.syncLegacyStateStrip === 'function') {
+        window.syncLegacyStateStrip();
+      }
+      await _sleep(50);
+    }
+  }
+  this._routeRunning = false;
+  if (this._combatState && this._combatState.aar) this._combatState.aar.routePts = path.length;
+  _renderAAR(this._combatState, { aborted: !!this._abortRoute });
+  if (this._emit) this._emit('info', this._abortRoute ? 'Transit ABORTED.' : 'Blue formation transit complete.');
+  this._abortRoute = false;
+  // Reset war-risk insurance delta + escalation rung back to idle baseline so the next
+  // simulation starts fresh. Oil-at-risk reads from the rung so it resets too.
+  if (typeof window !== 'undefined') {
+    window._liveInsuranceDelta = 0;
+    window._liveEscalationRung = 1;
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  }
+};

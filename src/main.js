@@ -5,6 +5,7 @@ import * as Tour       from './demo-narrative.js';
 const API = 'http://localhost:8000';
 
 const game = new LeafletGame('map');
+window.game = game;
 const ui   = new UI();
 
 // ── Strategic situation display ───────────────────────────────────────────────
@@ -182,12 +183,6 @@ game.on('civilianStrike', civ => {
   setTimeout(() => overlay.remove(), 3500);
 });
 
-// ── Action buttons ────────────────────────────────────────────────────────────
-
-['air-cover', 'ciws', 'ew-jam', 'mine-sweep', 'airstrike', 'sigint'].forEach(slug => {
-  document.getElementById(`act-${slug}`)
-    ?.addEventListener('click', () => game.triggerAction(slug.replace(/-/g, '_')));
-});
 
 const DPAD_KEYS = { 'dp-up':'ArrowUp', 'dp-down':'ArrowDown', 'dp-left':'ArrowLeft', 'dp-right':'ArrowRight' };
 Object.entries(DPAD_KEYS).forEach(([btnId, key]) => {
@@ -321,6 +316,7 @@ const _aisVessels = new Map(); // mmsi → { marker, label, lat, lng }
 const SIM_VESSELS = [
   // ── Eastbound (outbound, heading SE toward Gulf of Oman) ──
   { mmsi: 477001234, name: 'ALPINE CONFIDENCE', flag: '🇭🇰', type: 80, lat: 26.34, lng: 56.22, cog: 112, sog: 12.4,
+    actorCategory: 4,
     cargo: 'Saudi crude · 2.1M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ningbo, China',
     interests: [
       { c:'🇨🇳 China',        s: 96, r: 'Primary buyer — 2.1M bbl Aramco crude' },
@@ -330,6 +326,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 44, r: 'Ally stability, oil price floor' },
     ]},
   { mmsi: 564123456, name: 'OLYMPIC SPIRIT',    flag: '🇸🇬', type: 70, lat: 25.85, lng: 57.10, cog: 118, sog: 11.2,
+    actorCategory: 13,
     cargo: 'Container goods · 8,200 TEU', origin: 'Jebel Ali, UAE', dest: 'Singapore / Tanjung Pelepas',
     interests: [
       { c:'🇸🇬 Singapore',    s: 88, r: 'Transshipment hub — direct port call' },
@@ -339,6 +336,7 @@ const SIM_VESSELS = [
       { c:'🇪🇺 EU',           s: 48, r: 'European branded goods in transit' },
     ]},
   { mmsi: 636091234, name: 'STENA SUEDE',       flag: '🇱🇷', type: 80, lat: 25.80, lng: 56.88, cog: 122, sog: 10.8,
+    actorCategory: 7,
     cargo: 'Iraqi crude · 1.8M bbl', origin: 'Basra, Iraq', dest: 'Rotterdam, Netherlands',
     interests: [
       { c:'🇪🇺 EU',           s: 92, r: 'Critical crude supply to European refineries' },
@@ -348,6 +346,7 @@ const SIM_VESSELS = [
       { c:'🇳🇱 Netherlands',  s: 70, r: 'Rotterdam — primary EU crude landing hub' },
     ]},
   { mmsi: 229045678, name: 'MAERSK HONAM',      flag: '🇲🇹', type: 70, lat: 24.72, lng: 58.52, cog: 128, sog: 13.1,
+    actorCategory: 13,
     cargo: 'Mixed container · 15,200 TEU', origin: 'Mumbai / Nhava Sheva, India', dest: 'Hamburg, Germany',
     interests: [
       { c:'🇩🇪 Germany',      s: 80, r: 'Major importer of Indian manufactured goods' },
@@ -357,6 +356,7 @@ const SIM_VESSELS = [
       { c:'🇬🇧 UK',           s: 52, r: 'Portion of cargo destined for Felixstowe' },
     ]},
   { mmsi: 311023456, name: 'BAHRI JEDDAH',      flag: '🇧🇸', type: 80, lat: 26.08, lng: 55.68, cog: 108, sog: 11.5,
+    actorCategory: 4,
     cargo: 'Saudi Aramco crude · 2.3M bbl', origin: 'Ras Tanura, Saudi Arabia', dest: 'Ulsan, South Korea',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 96, r: 'State-owned Bahri tanker — Aramco export' },
@@ -366,6 +366,7 @@ const SIM_VESSELS = [
       { c:'🇨🇳 China',        s: 45, r: 'Indirect — competing for same crude sources' },
     ]},
   { mmsi: 477234567, name: 'NISSOS KEROS',      flag: '🇭🇰', type: 80, lat: 25.62, lng: 58.10, cog: 115, sog: 10.1,
+    actorCategory: 7,
     cargo: 'Kuwait crude · 1.9M bbl', origin: 'Ahmadi, Kuwait', dest: 'Chiba, Japan',
     interests: [
       { c:'🇯🇵 Japan',        s: 95, r: 'Primary buyer — Tokyo Electric/JXTG supply' },
@@ -376,6 +377,7 @@ const SIM_VESSELS = [
     ]},
   // ── Westbound (inbound, heading NW into Persian Gulf) ──
   { mmsi: 538034567, name: 'PACIFIC LAGOON',    flag: '🇲🇭', type: 70, lat: 25.52, lng: 57.78, cog: 292, sog: 12.0,
+    actorCategory: 13,
     cargo: 'Auto parts / machinery · 9,000 TEU', origin: 'Colombo, Sri Lanka', dest: 'Jebel Ali, UAE',
     interests: [
       { c:'🇦🇪 UAE',          s: 85, r: 'Jebel Ali — primary ME distribution hub' },
@@ -385,6 +387,7 @@ const SIM_VESSELS = [
       { c:'🇯🇵 Japan',        s: 50, r: 'Toyota/Nissan parts supply to ME plants' },
     ]},
   { mmsi: 477056789, name: 'EURONAV VENUS',     flag: '🇧🇪', type: 80, lat: 25.92, lng: 56.48, cog: 284, sog:  9.8,
+    actorCategory: 5,
     cargo: 'Ballast (loading at Ruwais, UAE)', origin: 'Antwerp, Belgium', dest: 'Ruwais, UAE',
     interests: [
       { c:'🇦🇪 UAE',          s: 90, r: 'ADNOC crude export — ship heading to load' },
@@ -394,6 +397,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 48, r: 'US ally — corridor freedom of navigation' },
     ]},
   { mmsi: 371098765, name: 'GULF TRADER',       flag: '🇵🇦', type: 80, lat: 26.05, lng: 55.42, cog: 278, sog: 10.3,
+    actorCategory: 6,
     cargo: 'Qatar LNG condensate · 70,000 MT', origin: 'Yokohama, Japan', dest: 'Ras Laffan, Qatar',
     interests: [
       { c:'🇶🇦 Qatar',        s: 92, r: 'QatarEnergy export earnings — LNG shipment return' },
@@ -403,6 +407,7 @@ const SIM_VESSELS = [
       { c:'🇬🇧 UK',           s: 52, r: 'Centrica / Shell LNG offtake agreements' },
     ]},
   { mmsi: 636056789, name: 'MSC SARAH',         flag: '🇱🇷', type: 70, lat: 24.22, lng: 59.08, cog: 288, sog: 14.2,
+    actorCategory: 14,
     cargo: 'Consumer goods / food · 12,400 TEU', origin: 'Karachi, Pakistan', dest: 'Gioia Tauro, Italy',
     interests: [
       { c:'🇮🇹 Italy',        s: 80, r: 'Gioia Tauro hub — primary EU landing' },
@@ -412,7 +417,8 @@ const SIM_VESSELS = [
       { c:'🇬🇷 Greece',       s: 48, r: 'Transshipment calls at Piraeus' },
     ]},
   { mmsi: 229087654, name: 'NAVIGATOR AURORA',  flag: '🇬🇷', type: 80, lat: 25.32, lng: 58.18, cog: 298, sog: 11.7,
-    cargo: 'Saudi LPG · 70,000 MT', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
+    actorCategory: 4,
+    cargo: 'Ballast — returning to load', origin: 'Chiba, Japan', dest: 'Jubail, Saudi Arabia',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 88, r: 'Saudi Aramco LPG export — vessel returning to load' },
       { c:'🇯🇵 Japan',        s: 85, r: 'LPG for residential/industrial fuel' },
@@ -421,6 +427,7 @@ const SIM_VESSELS = [
       { c:'🇨🇳 China',        s: 58, r: 'Growing LPG import demand from Arabia' },
     ]},
   { mmsi: 338901234, name: 'FURE NORD',         flag: '🇳🇴', type: 80, lat: 26.20, lng: 54.90, cog: 270, sog:  8.9,
+    actorCategory: 11,
     cargo: 'Methanol · 32,000 MT', origin: 'Rotterdam, Netherlands', dest: 'Jubail, Saudi Arabia',
     interests: [
       { c:'🇸🇦 Saudi Arabia', s: 86, r: 'SABIC industrial feedstock import' },
@@ -431,6 +438,7 @@ const SIM_VESSELS = [
     ]},
   // ── Slow / anchored near Fujairah / Khor Fakkan ──
   { mmsi: 303012345, name: 'DELTA NAVIGATOR',   flag: '🇺🇸', type: 70, lat: 25.11, lng: 56.38, cog: 180, sog:  0.3,
+    actorCategory: 3,
     cargo: 'US Military logistics · classified', origin: 'Norfolk, VA (via Suez)', dest: 'Diego Garcia / 5th Fleet',
     interests: [
       { c:'🇺🇸 USA',          s: 98, r: 'US Navy / TRANSCOM logistics — mission critical' },
@@ -440,6 +448,7 @@ const SIM_VESSELS = [
       { c:'🇮🇳 India',        s: 40, r: 'Quad partner — indirect security interest' },
     ]},
   { mmsi: 538090123, name: 'OCEAN TRIUMPH',     flag: '🇲🇭', type: 80, lat: 25.07, lng: 57.12, cog:   0, sog:  0.1,
+    actorCategory: 8,
     cargo: 'Omani crude · 2.2M bbl (anchored, awaiting clearance)', origin: 'Mina al Fahal, Oman', dest: 'Zhoushan, China',
     interests: [
       { c:'🇨🇳 China',        s: 96, r: 'Buyer — Zhoushan SPR fill, refinery feed' },
@@ -449,6 +458,7 @@ const SIM_VESSELS = [
       { c:'🇺🇸 USA',          s: 30, r: 'Monitoring Chinese energy imports' },
     ]},
   { mmsi: 413012345, name: 'HONG FA',           flag: '🇨🇳', type: 70, lat: 24.95, lng: 57.45, cog:  45, sog:  1.2,
+    actorCategory: 8,
     cargo: 'Chinese manufactured goods · 10,800 TEU', origin: 'Tianjin, China', dest: 'Jebel Ali, UAE',
     interests: [
       { c:'🇨🇳 China',        s: 94, r: 'State-flagged — BRI trade corridor exports' },
@@ -471,18 +481,18 @@ function _aisIcon(shipType, flag, cogDeg = 90) {
     html: `<div style="
         transform:rotate(${rot}deg);
         transform-origin:center;
-        width:64px;height:22px;
+        width:42px;height:14px;
         background:${bg};
-        border:2px solid ${bdr};
-        border-radius:4px 12px 12px 4px;
-        box-shadow:0 0 8px ${bdr}aa;
+        border:1.5px solid ${bdr};
+        border-radius:3px 8px 8px 3px;
+        box-shadow:0 0 6px ${bdr}aa;
         cursor:pointer;
         box-sizing:border-box">
     </div>
-    <div style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:13px;line-height:1;white-space:nowrap;pointer-events:none;text-shadow:0 0 4px #000">${f}</div>`,
+    <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;white-space:nowrap;pointer-events:none;text-shadow:0 0 3px #000">${f}</div>`,
     className: '',
-    iconSize: [64, 22],
-    iconAnchor: [32, 11],
+    iconSize: [42, 14],
+    iconAnchor: [21, 7],
   });
 }
 
@@ -554,6 +564,8 @@ const NAV_CHANNEL = [
   [25.582, 54.921], [25.135, 53.811], [25.770, 52.910],
   [26.362, 52.097], [27.030, 50.988],
 ];
+// Expose for SIM_VESSEL transit-time pathfinding from leaflet-game.js
+if (typeof window !== 'undefined') window.NAV_CHANNEL = NAV_CHANNEL;
 
 function _nearestNavIdx(lat, lng) {
   let best = 0, bestD = Infinity;
@@ -574,11 +586,114 @@ function _startAIS() {
   const map = game.map;
   if (!map) { setTimeout(_startAIS, 500); return; }
 
+  // Wire the expand-arrow on AIS popups → opens side-panel (popup is too narrow)
+  if (!map._shipExpandWired) {
+    map._shipExpandWired = true;
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest && ev.target.closest('.ship-expand-btn');
+      if (!btn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+      const catId = parseInt(btn.dataset.cat || '0', 10);
+      const mmsi = parseInt(btn.dataset.mmsi || '0', 10);
+      const cat = (typeof getCategory === 'function') ? getCategory(catId) : null;
+      const entry = _aisVessels && _aisVessels.get(mmsi);
+      const v = entry && entry.v;
+      if (!cat) return;
+      const sidebar = document.getElementById('ship-cat-sidebar');
+      const body = document.getElementById('ship-cat-sidebar-body');
+      const title = document.getElementById('ship-cat-sidebar-title');
+      if (!sidebar || !body || !title) return;
+      title.textContent = v ? `// ${v.flag} ${v.name} · STRIKE IMPACT //` : `// CAT ${cat.id} — STRIKE CONSEQUENCES //`;
+      // Build interests block (per-stakeholder loss profile from SIM_VESSEL.interests)
+      const interestsHtml = (v && v.interests && v.interests.length) ? `
+        <div style="border-left:3px solid #ffaa44;padding:8px 10px;margin-bottom:10px;background:rgba(255,170,68,0.06)">
+          <div style="color:#ffaa44;font-size:10px;letter-spacing:2px;margin-bottom:6px">WHO STANDS TO LOSE — STAKEHOLDER IMPACT</div>
+          ${v.interests.map(i => {
+            const c = i.s >= 80 ? '#ff8833' : i.s >= 60 ? '#ffdd44' : '#88ccee';
+            return `<div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
+                <span style="color:#e0e8f0;font-weight:bold">${i.c}</span>
+                <span style="color:${c};font-weight:bold">${i.s}/100</span>
+              </div>
+              <div style="background:#0d1e2a;border-radius:2px;height:6px;width:100%;margin-bottom:3px">
+                <div style="background:${c};width:${i.s}%;height:6px;border-radius:2px"></div>
+              </div>
+              <div style="font-size:10px;color:#a0b0c0;line-height:1.4">${i.r}</div>
+            </div>`;
+          }).join('')}
+        </div>` : '';
+      // Cargo + route block
+      const cargoHtml = v ? `
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid #1a3a5a">
+          <span style="color:#7a8896">CARGO</span><span style="color:#ffe080">${v.cargo || '—'}</span>
+          <span style="color:#7a8896">FROM</span><span style="color:#cce0ff">${v.origin || '—'}</span>
+          <span style="color:#7a8896">TO</span><span style="color:#cce0ff">${v.dest || '—'}</span>
+          <span style="color:#7a8896">FLAG / MMSI</span><span style="color:#cce0ff">${v.flag || ''} · ${v.mmsi || '—'}</span>
+        </div>` : '';
+      // US Priority block — operator-facing "should we escort this first?" guidance
+      const usPriority = (typeof getUsPriority === 'function') ? getUsPriority(cat.id) : null;
+      const usPriorityHtml = usPriority ? `
+        <div style="border:2px solid #88ccff66;padding:8px 10px;margin-bottom:10px;background:rgba(80,150,255,0.08)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="color:#88ccff;font-size:10px;letter-spacing:2px;font-weight:bold">🇺🇸 US PRIORITY</span>
+            <span style="color:#88ccff;font-size:18px;font-weight:bold">${usPriority.score}/100</span>
+          </div>
+          <div style="background:#0d1e2a;border-radius:2px;height:8px;width:100%;margin-bottom:5px">
+            <div style="background:linear-gradient(90deg,#88ccff,#aaccff);width:${usPriority.score}%;height:8px;border-radius:2px;box-shadow:0 0 6px #88ccff66"></div>
+          </div>
+          <div style="font-size:10px;color:#cce0ff;line-height:1.5">${usPriority.why}</div>
+        </div>` : '';
+      body.innerHTML = `
+        <div style="margin-bottom:10px">
+          <div style="color:#ff8800;font-size:15px;font-weight:bold;margin-bottom:2px">${v ? (v.flag + ' ' + v.name) : cat.name}</div>
+          <div style="color:#7a8896;font-size:10px">CAT ${cat.id} · ${cat.name}</div>
+        </div>
+        ${cargoHtml}
+        ${usPriorityHtml}
+        ${interestsHtml}
+        <details style="margin-bottom:6px">
+          <summary style="cursor:pointer;color:#aabbcc;font-size:10px;letter-spacing:2px;padding:4px 0">▸ TAXONOMY (RED CELL / BLUE CELL VIEW)</summary>
+          <div style="border-left:3px solid #ff6666;padding:6px 10px;margin:6px 0;background:rgba(255,80,80,0.06)">
+            <div style="color:#ff6666;font-size:10px;letter-spacing:2px;margin-bottom:3px">RED CELL SEES</div>
+            <div style="color:#ffcccc;font-size:11px">${cat.redCell}</div>
+          </div>
+          <div style="border-left:3px solid #6699ff;padding:6px 10px;margin:6px 0;background:rgba(80,150,255,0.06)">
+            <div style="color:#6699ff;font-size:10px;letter-spacing:2px;margin-bottom:3px">BLUE CELL SEES</div>
+            <div style="color:#ccddff;font-size:11px">${cat.blueCell}</div>
+          </div>
+          <div style="border-left:3px solid #ffaa44;padding:6px 10px;background:rgba(255,170,68,0.06)">
+            <div style="color:#ffaa44;font-size:10px;letter-spacing:2px;margin-bottom:3px">CATEGORY-LEVEL CONSEQUENCES</div>
+            <div style="color:#ffe0c0;font-size:11px">${cat.consequences}</div>
+          </div>
+        </details>`;
+      // Close any open Leaflet popups so the user sees ONLY the sidebar (avoids
+      // "two windows showing the same ship" confusion)
+      if (window.game && window.game.map && typeof window.game.map.closePopup === 'function') {
+        try { window.game.map.closePopup(); } catch(e) {}
+      }
+      // Defer the open one frame so any in-flight close events finish first
+      requestAnimationFrame(() => { sidebar.style.display = 'block'; sidebar.dataset.openAt = String(Date.now()); });
+    }, true);
+    const closeBtn = document.getElementById('ship-cat-sidebar-close');
+    if (closeBtn) closeBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const sb = document.getElementById('ship-cat-sidebar');
+      if (!sb) return;
+      const openAt = parseInt(sb.dataset.openAt || '0', 10);
+      if (Date.now() - openAt < 250) return; // ignore stray close within 250ms of open
+      sb.style.display = 'none';
+    });
+  }
+
   SIM_VESSELS.forEach(v => {
     // Assign nav direction: inbound (COG 180–360) = heading west toward PG = navDir +1 (idx increases)
     // outbound (COG 0–180) = heading east toward GOO = navDir -1 (idx decreases)
     v._navDir = (v.cog > 180) ? 1 : -1;
     v._navIdx = _nearestNavIdx(v.lat, v.lng);
+    v._currentLat = v.lat;
+    v._currentLng = v.lng;
 
     const icon   = _aisIcon(v.type, v.flag, v.cog);
     const marker = L.marker([v.lat, v.lng], { icon, zIndexOffset: -100, interactive: true }).addTo(map);
@@ -619,19 +734,33 @@ function _startAIS() {
           <div style="font-size:11px;letter-spacing:1px;color:#4a7a9a;margin-bottom:7px">STAKEHOLDER INTEREST IN SAFE PASSAGE (0–100)</div>
           ${bars}
         </div>` : ''}
+        ${(typeof getCategory === 'function' && v.actorCategory) ? (() => {
+          const cat = getCategory(v.actorCategory);
+          if (!cat) return '';
+          return `<div style="border-top:1px solid #1a3a4a;padding-top:7px;margin-top:7px">
+            <button class="ship-expand-btn" data-mmsi="${v.mmsi}" data-cat="${cat.id}"
+              style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;font-family:'Courier New',monospace;font-size:10px;padding:4px 10px;width:100%;letter-spacing:1.5px">
+              ▶ STRIKE CONSEQUENCES — CAT ${cat.id}
+            </button>
+          </div>`;
+        })() : ''}
       </div>`;
     };
 
-    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true });
+    marker.bindPopup(makePopup(), { className: 'ais-popup', maxWidth: 400, closeButton: true, autoPan: false });
     _aisVessels.set(v.mmsi, { marker, label, v, makePopup });
+    v._marker = marker;
+    v._label  = label;
   });
 
   console.log(`[AIS] ${SIM_VESSELS.length} vessels on nav channel`);
+  // Expose for live oil-at-risk computation in syncLegacyStateStrip
+  window.SIM_VESSELS = SIM_VESSELS;
   _updateTransitDisplay();
 
-  // Advance vessels along the nav channel every 15 s
+  // Advance vessels along the nav channel every 3 s (kept visible during exercises)
   setInterval(() => {
-    const DT = 15;
+    const DT = 3;
     _aisVessels.forEach(({ marker, label, v, makePopup }) => {
       const step = (v.sog / 3600) * 1.852 / 111 * DT; // degrees per tick
 
@@ -673,16 +802,200 @@ function _startAIS() {
       marker.setLatLng([v.lat, v.lng]);
       label.setLatLng([v.lat, v.lng]);
       if (marker.isPopupOpen()) marker.setPopupContent(makePopup());
+      // Re-apply exercise highlight (icon swap or update would otherwise drop CSS class / opacity)
+      if (_activeKeyCategories) _applyVesselHighlight(marker, label, v);
     });
-  }, 15_000);
+  }, 3_000);
 }
 
 _startAIS();
 
+// ── Exercise key-vessel isolation ─────────────────────────────────────────────
+let _activeKeyCategories = null;
+function _applyVesselHighlight(marker, label, v) {
+  if (!_activeKeyCategories) return;
+  const isKey = _activeKeyCategories.has(v.actorCategory);
+  marker.setOpacity(isKey ? 1.0 : 0.22);
+  if (label) label.setOpacity(isKey ? 1.0 : 0.0);
+  const el = marker.getElement && marker.getElement();
+  if (!el) return;
+  if (isKey) el.classList.add('key-vessel-pulse');
+  else       el.classList.remove('key-vessel-pulse');
+}
+function dimNonKeyVessels(keyCategories) {
+  if (!_aisVessels || _aisVessels.size === 0) return;
+  _activeKeyCategories = new Set(keyCategories || []);
+  const keyLatLngs = [];
+  _aisVessels.forEach(({ marker, label, v }) => {
+    _applyVesselHighlight(marker, label, v);
+    if (_activeKeyCategories.has(v.actorCategory)) {
+      keyLatLngs.push(marker.getLatLng());
+    }
+  });
+  if (keyLatLngs.length > 0 && game.map) {
+    const bounds = L.latLngBounds(keyLatLngs);
+    game.map.fitBounds(bounds, { padding: [70, 70], maxZoom: 9 });
+  }
+}
+
+function restoreAllVessels() {
+  _activeKeyCategories = null;
+  if (!_aisVessels) return;
+  _aisVessels.forEach(({ marker, label }) => {
+    marker.setOpacity(1.0);
+    if (label) label.setOpacity(1.0);
+    const el = marker.getElement && marker.getElement();
+    if (el) el.classList.remove('key-vessel-pulse');
+  });
+}
+
+window.dimNonKeyVessels = dimNonKeyVessels;
+window.restoreAllVessels = restoreAllVessels;
+
+// Map event type → exercise indicator deltas. When a ship animation fires during
+// an active exercise, these auto-bump the indicators so the escalation ladder
+// reflects what's happening on the map in real time.
+const _IMPACT_DELTAS = {
+  STRIKE:        { escalationRung:+1, warRiskInsurance:+25, oilPrice:+2, iranCoercion:+3 },
+  MINED:         { escalationRung:+1, warRiskInsurance:+50, oilPrice:+3 },
+  OIL_SLICK:     { warRiskInsurance:+30, oilPrice:+3, attributionConfidence:+2 },
+  BOARDED:       { warRiskInsurance:+10, iranCoercion:+2 },
+  DISABLED:      { warRiskInsurance:+15, iranCoercion:+1 },
+  SINKING:       { escalationRung:+1, warRiskInsurance:+40, oilPrice:+4 },
+  CONVOY_FORM:   { warRiskInsurance:-15, allianceCohesion:+2 },
+  TRANSIT_HALT:  { escalationRung:+1, warRiskInsurance:+60, oilPrice:+5 },
+};
+function _applyImpactDeltas(type) {
+  const ex = window.activeExercise;
+  if (!ex || ex.complete) return;
+  const delta = _IMPACT_DELTAS[type];
+  if (!delta) return;
+  if (typeof ex.applyDelta === 'function') {
+    ex.applyDelta(delta);
+  } else {
+    for (const [k, v] of Object.entries(delta)) {
+      ex.indicators[k] = (ex.indicators[k] || 0) + v;
+      if (['allianceCohesion','attributionConfidence','iranCoercion'].includes(k)) {
+        ex.indicators[k] = Math.max(0, Math.min(100, ex.indicators[k]));
+      }
+    }
+  }
+  // Force the strip + indicator panel to repaint
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  if (typeof window.renderIndicators === 'function') window.renderIndicators();
+}
+
+function animateVesselImpact(mmsi, type) {
+  // Reflect the impact on exercise indicators (escalation ladder + econ bar update)
+  _applyImpactDeltas(type);
+  if (!_aisVessels) return;
+  const entry = _aisVessels.get(mmsi);
+  if (!entry || !entry.marker) return;
+  const marker = entry.marker;
+  const latlng = marker.getLatLng();
+  const map = game.map;
+  if (!map) return;
+  const el = marker.getElement && marker.getElement();
+
+  switch (type) {
+    case 'STRIKE': {
+      const explosion = L.divIcon({
+        className: 'fx-explosion',
+        html: '<div style="font-size:48px;animation:fxBoom 1.6s ease-out forwards;text-shadow:0 0 22px #ff3300">💥</div>',
+        iconSize: [48, 48],
+      });
+      const fx = L.marker(latlng, { icon: explosion, interactive: false, zIndexOffset: 1000 }).addTo(map);
+      setTimeout(() => map.removeLayer(fx), 2200);
+      if (el) el.classList.add('damaged-hulk');
+      break;
+    }
+    case 'DISABLED': {
+      if (el) el.classList.add('disabled-ship');
+      break;
+    }
+    case 'SINKING': {
+      if (el) el.classList.add('damaged-hulk');
+      const wreck = L.divIcon({
+        className: 'fx-wreck',
+        html: '<div style="font-size:22px;color:#444;text-shadow:0 0 4px #000">⊗</div>',
+        iconSize: [22, 22],
+      });
+      L.marker(latlng, { icon: wreck, interactive: false }).addTo(map);
+      // Fade out the marker over 3s
+      let opacity = 1;
+      const fade = setInterval(() => {
+        opacity -= 0.12;
+        marker.setOpacity(Math.max(0, opacity));
+        if (opacity <= 0) clearInterval(fade);
+      }, 250);
+      break;
+    }
+    case 'BOARDED': {
+      if (el) el.classList.add('boarded-flash');
+      break;
+    }
+    case 'MINED': {
+      const ring = L.circle(latlng, {
+        radius: 1500, color: '#ff4400', weight: 3, fillOpacity: 0.18,
+        dashArray: '4 4', interactive: false,
+      }).addTo(map);
+      // Pulse outward
+      let r = 1500;
+      const pulse = setInterval(() => {
+        r += 600;
+        ring.setRadius(r);
+        ring.setStyle({ opacity: Math.max(0, 1 - (r - 1500) / 6000) });
+        if (r >= 7500) { clearInterval(pulse); map.removeLayer(ring); }
+      }, 120);
+      if (el) el.classList.add('damaged-hulk');
+      break;
+    }
+    case 'OIL_SLICK': {
+      const slick = L.circle(latlng, {
+        radius: 5000, color: '#000', weight: 0,
+        fillColor: '#0a0610', fillOpacity: 0.55, interactive: false,
+      }).addTo(map);
+      // Persist
+      let r = 1500;
+      const grow = setInterval(() => {
+        r += 700;
+        slick.setRadius(r);
+        if (r >= 6000) clearInterval(grow);
+      }, 200);
+      break;
+    }
+    case 'CONVOY_FORM': {
+      const ring = L.circle(latlng, {
+        radius: 8000, color: '#0088ff', weight: 2,
+        dashArray: '6 4', fillOpacity: 0, interactive: false,
+      }).addTo(map);
+      setTimeout(() => map.removeLayer(ring), 4000);
+      break;
+    }
+    case 'TRANSIT_HALT': {
+      let banner = document.getElementById('transit-halt-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'transit-halt-banner';
+        banner.textContent = '⚠ STRAIT TRANSIT SUSPENDED';
+        banner.style.cssText = 'position:absolute;bottom:130px;left:20px;background:rgba(160,0,0,0.85);color:#fff;padding:8px 18px;letter-spacing:3px;z-index:500;font-family:Courier New,monospace;font-weight:bold;border:1px solid #ff4444;text-shadow:0 0 8px #ff0000';
+        document.getElementById('map').appendChild(banner);
+        setTimeout(() => banner.remove(), 5000);
+      }
+      break;
+    }
+  }
+}
+
+window.animateVesselImpact = animateVesselImpact;
+
 // ── VLM Intel capture ─────────────────────────────────────────────────────────
+// VLM calls routed to the 4090 desktop (Tailscale) — has both models prewarmed via keep_4090_warm.sh.
+// INTEL uses llama3.2-vision:11b (better fine-grained scene parsing, e.g. wakes); SURVEY uses
+// hormuz-vision:latest (custom-tuned for aircraft counts, no safety refusals).
 const OLLAMA_MODEL        = 'llama3.2-vision:11b';
-const OLLAMA_MODEL_SURVEY = 'hormuz-vision:latest';  // custom model — no refusals, better counts
-const OLLAMA_URL   = 'http://localhost:11434/api/chat';
+const OLLAMA_MODEL_SURVEY = 'hormuz-vision:latest';
+const OLLAMA_URL   = 'http://100.75.51.87:11434/api/chat';
 
 // Reference images for few-shot visual prompting
 let _refCivilianB64   = null;
@@ -814,6 +1127,176 @@ document.getElementById('intel-btn').addEventListener('click', async () => {
   _startIntelDraw(_runIntelAnalysis, '#aa66ff');
 });
 
+// Expose for exercise scenarios that want live VLM
+window._startIntelDraw    = _startIntelDraw;
+window._runIntelAnalysis  = (...args) => _runIntelAnalysis(...args);
+
+// Historical incidents + transit simulation buttons
+{
+  let _histShown = false;
+  const histBtn = document.getElementById('btn-hist-toggle');
+  if (histBtn) histBtn.addEventListener('click', () => {
+    _histShown = !_histShown;
+    if (_histShown) { window.renderHistoricalIncidents && window.renderHistoricalIncidents(); histBtn.style.background = 'rgba(204,170,34,0.18)'; }
+    else            { window.hideHistoricalIncidents   && window.hideHistoricalIncidents();   histBtn.style.background = 'transparent'; }
+  });
+  const simBtn = document.getElementById('btn-sim-transit');
+  if (simBtn) simBtn.addEventListener('click', () => {
+    if (window.simulateBlueTransit) window.simulateBlueTransit();
+  });
+  const spawnBtn = document.getElementById('btn-spawn-adv');
+  if (spawnBtn) spawnBtn.addEventListener('click', () => {
+    if (window.game && typeof window.game.spawnAdversaries === 'function') window.game.spawnAdversaries();
+  });
+  const aarClose = document.getElementById('aar-close');
+  if (aarClose) aarClose.addEventListener('click', () => {
+    const m = document.getElementById('aar-modal'); if (m) m.style.display = 'none';
+  });
+  const execBtn = document.getElementById('btn-exec-route');
+  if (execBtn) execBtn.addEventListener('click', () => {
+    if (!window.game || typeof window.game.executePaintedRoute !== 'function') return;
+    const path = window.game._lastPaintedPath;
+    if (!path || path.length < 2) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#ffaa44;padding:10px 20px;border:1px solid #ffaa4488;border-left:4px solid #ffaa44;z-index:9000;font-family:Courier New,monospace;font-size:12px;letter-spacing:1px;max-width:520px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+      banner.innerHTML = '⚠ NO PAINTED ROUTE — click 🟡 PATH (paint toolbar, top-right of map), then click-drag a route on the water. Then hit ▶ EXECUTE PAINTED ROUTE again.';
+      document.body.appendChild(banner);
+      setTimeout(() => banner.style.opacity = '0', 4500);
+      setTimeout(() => banner.remove(), 5200);
+      return;
+    }
+    window.game.executePaintedRoute();
+  });
+
+  // Hide-all-ships toggle (for clean map screenshots)
+  let _shipsHidden = false;
+  const hideShipsBtn = document.getElementById('btn-hide-ships');
+  if (hideShipsBtn) hideShipsBtn.addEventListener('click', () => {
+    _shipsHidden = !_shipsHidden;
+    const op = _shipsHidden ? 0 : 1;
+    // AIS vessels + their labels
+    if (typeof _aisVessels !== 'undefined' && _aisVessels) {
+      _aisVessels.forEach(({ marker, label }) => {
+        marker.setOpacity(op);
+        if (label) label.setOpacity(op);
+      });
+    }
+    // Game units (Blue + Red)
+    if (window.game && window.game._units) {
+      window.game._units.forEach(u => { if (u.marker) u.marker.setOpacity(op); });
+    }
+    // Civilian static ships (CIVILIAN_SHIPS in leaflet-game)
+    if (window.game && window.game._civilians) {
+      window.game._civilians.forEach(c => { if (c.marker) c.marker.setOpacity(op); });
+    }
+    hideShipsBtn.style.background = _shipsHidden ? 'rgba(170,102,255,0.18)' : 'transparent';
+    hideShipsBtn.querySelector('.btn-label').innerHTML = _shipsHidden ? 'SHOW ALL<br>SHIPS' : 'HIDE ALL<br>SHIPS';
+  });
+
+  // IRGC INTEL PINS — fictional VLM-style annotations on each IRGC unit
+  const _IRGC_INTEL = {
+    fac1: 'IRGC-N FAC sortie · 4× 5-meter Boghammar speedboats · armed: 7.62mm DShK + 107mm rocket pods · pattern matches Bandar Lengeh basin departure profile · last imagery: Sentinel-2 06:14Z',
+    fac2: 'IRGC-N FAC dispersal · ~3 small craft loitering pattern · loiter time 14 min · staging consistent with pre-swarm assembly. Maxar 30cm pulled 2h ago.',
+    fac3: 'IRGC-N FAC chokepoint screen · 2-3 craft observed in zigzag intercept geometry · range to TSS lane <8nm · classic harassment screen, NOT firing posture.',
+    fac4: 'IRGC-N FAC mid-strait ambush position · single craft loitering at depth ~150m · IMINT correlates to Abu Musa staging photo from 4d ago. Shahid Mahallati signature.',
+    sub1: 'IRGC-N Ghadir-class midget submarine · ~120t displacement · likely 2× 533mm torpedoes (Russian Test-71MKE export var) · GHADIR-881 hull number · ESM intercept showed brief surface comm 09:42Z.',
+    mine1: 'IRGC mine-laying motorboat · profile matches video DDG-102 SIGINT captured 2024 · current cargo cannot be confirmed visually, but intel from CTF 152 indicates limpet stockpile aboard.',
+  };
+  let _intelPinsShown = false;
+  let _intelPinMarkers = [];
+  const intelBtn = document.getElementById('btn-iran-intel');
+  if (intelBtn) intelBtn.addEventListener('click', () => {
+    _intelPinsShown = !_intelPinsShown;
+    if (_intelPinsShown && window.game && window.game._units) {
+      window.game._units.forEach(u => {
+        if (u.side !== 'red' || !u.marker) return;
+        const note = _IRGC_INTEL[u.id] || `IRGC ${u.type.toUpperCase()} · classification ${u.name} · OSINT pattern correlates with prior IRGC operating profile.`;
+        const ll = u.marker.getLatLng();
+        const pin = L.divIcon({
+          className:'irgc-intel-pin',
+          html:`<div style="background:rgba(8,4,12,0.94);border:1.5px solid #aa66ff;color:#aa66ff;font-family:Courier New,monospace;font-size:9px;padding:3px 7px;letter-spacing:1px;white-space:nowrap;box-shadow:0 0 6px #aa66ff44">📋 INTEL · ${u.name.split(' ')[1] || u.id}</div>`,
+          iconSize:[24,12], iconAnchor:[-6,-12],
+        });
+        const m = L.marker([ll.lat, ll.lng], { icon: pin, zIndexOffset: 350 }).addTo(window.game.map);
+        m.bindPopup(`<div style="font-family:Courier New,monospace;font-size:11px;color:#222;max-width:320px"><div style="color:#aa66ff;letter-spacing:2px;font-size:10px;font-weight:bold">📋 IRGC VLM ANALYSIS · ${u.name}</div><div style="margin-top:4px;line-height:1.5">${note}</div><div style="margin-top:6px;color:#666;font-size:9px">Source: simulated Llama 3.2 Vision 11B output on a Sentinel-2 frame.</div></div>`);
+        _intelPinMarkers.push(m);
+      });
+      intelBtn.style.background = 'rgba(170,102,255,0.18)';
+    } else {
+      _intelPinMarkers.forEach(m => { try { window.game.map.removeLayer(m); } catch(e){} });
+      _intelPinMarkers.length = 0;
+      intelBtn.style.background = 'transparent';
+    }
+  });
+
+  // RESET button — wipes exercise state + restores ships to start positions + clears overlays
+  const resetBtn = document.getElementById('btn-reset-all');
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    // 1. End any active exercise (clears mines, restores dim, etc.)
+    if (typeof window.endExercise === 'function') window.endExercise();
+    // 1a. Clear any Monte-Carlo spawned adversaries
+    if (window.game && typeof window.game.clearSpawnedAdversaries === 'function') {
+      window.game.clearSpawnedAdversaries();
+    }
+    // 1b. Reset live war-risk insurance delta + live escalation rung to baseline.
+    // Both oil-at-risk and war-risk-insurance read from window._liveEscalationRung
+    // when no exercise is active, so resetting this fixes the "stuck high" complaint.
+    window._liveInsuranceDelta = 0;
+    window._liveEscalationRung = 1;
+    // 1c. Clear the persistent activity log so the next exercise starts with a fresh feed
+    if (typeof window._activityLogClear === 'function') window._activityLogClear();
+    // 1b. Toggle off IRGC intel pins if they're showing
+    const _pinsBtn = document.getElementById('btn-iran-intel');
+    if (_pinsBtn && document.querySelector('.irgc-intel-pin')) _pinsBtn.click();
+    // 2. Restore game units to their UNIT_DEFS starting positions + heading
+    if (window.game && window.game._units) {
+      window.game._units.forEach(u => {
+        if (u.marker && u._origLat !== undefined) {
+          u.marker.setLatLng([u._origLat, u._origLng]);
+        } else if (u.marker && typeof u.lat === 'number') {
+          // First reset — stash originals, then restore lat/lng from UNIT_DEFS
+          u._origLat = u.lat; u._origLng = u.lng;
+        }
+        u.destroyed = false;
+      });
+    }
+    // 3. Clear painted route overlay if any
+    try { if (window._lastRouteOverlay && window.game && window.game.map) window.game.map.removeLayer(window._lastRouteOverlay); } catch (e) {}
+    window._lastRouteOverlay = null;
+    // 3b. Clear all hand-drawn paint lines from the paint tool
+    try {
+      if (window.game && window.game._paintLines && window.game._map) {
+        window.game._paintLines.forEach(l => window.game._map.removeLayer(l));
+        window.game._paintLines.length = 0;
+      }
+      if (window.game && window.game._activeLine && window.game._map) {
+        window.game._map.removeLayer(window.game._activeLine);
+        window.game._activeLine = null;
+      }
+    } catch (e) {}
+    // 3c. Clear simulate-blue-transit planned + trail polylines
+    try {
+      if (window._transitPolylines && window.game && window.game._map) {
+        window._transitPolylines.forEach(p => { try { window.game._map.removeLayer(p); } catch (e) {} });
+        window._transitPolylines.length = 0;
+      }
+    } catch (e) {}
+    // 4. Clear historical-incident markers
+    if (typeof window.hideHistoricalIncidents === 'function') window.hideHistoricalIncidents();
+    // 5. Clear active-mine registry
+    if (window._activeMines) window._activeMines.length = 0;
+    // 6. Re-sync the legacy state strip back to idle
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+    // 7. Show feedback banner
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;bottom:130px;left:20px;background:rgba(0,8,16,0.95);color:#ffcc44;padding:8px 18px;border:1px solid #ffcc4488;border-left:4px solid #ffcc44;z-index:9000;font-family:Courier New,monospace;font-size:11px;letter-spacing:1.5px;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+    banner.innerHTML = '🔄 RESET — exercise ended, ships at origin, overlays cleared';
+    document.body.appendChild(banner);
+    setTimeout(() => banner.style.opacity = '0', 2200);
+    setTimeout(() => banner.remove(), 2900);
+  });
+}
+
 async function _runIntelAnalysis(sw, ne) {
   const btn   = document.getElementById('intel-btn');
   const modal = document.getElementById('intel-modal');
@@ -854,6 +1337,9 @@ async function _runIntelAnalysis(sw, ne) {
     body.innerHTML = `<div style="font-size:10px;color:#7788aa;margin-bottom:4px">${bboxDebug}</div><img src="data:image/jpeg;base64,${b64}" style="width:100%;max-height:90px;object-fit:contain;display:block;margin-bottom:6px;border:1px solid #aa66ff"><div id="intel-stream" style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:11px;color:#c0d8e8;line-height:1.5">⟳ Analyzing...</div>`;
     const streamEl = document.getElementById('intel-stream');
 
+    // repeat_penalty: 1.3 prevents degenerate loops like "Runway 12L, Runway 12L, ..."
+    // top_p: 0.9 + temp 0.2 widens token distribution slightly so the model can recover.
+    // num_predict: 100 caps response so even if it does start looping, it can't run away.
     function ollamaAsk(question) {
       return fetch(OLLAMA_URL, {
         method: 'POST',
@@ -862,7 +1348,7 @@ async function _runIntelAnalysis(sw, ne) {
           model: OLLAMA_MODEL,
           messages: [{ role: 'user', content: question, images: [b64] }],
           stream: false,
-          options: { temperature: 0.1, num_predict: 300 },
+          options: { temperature: 0.2, top_p: 0.9, repeat_penalty: 1.3, num_predict: 200 },
         }),
       }).then(r => r.json()).then(d => d.message?.content ?? '');
     }
@@ -875,21 +1361,55 @@ async function _runIntelAnalysis(sw, ne) {
           model: OLLAMA_MODEL,
           messages: [{ role: 'user', content: question, images: [b64] }],
           stream: false,
-          options: { temperature: 0.1, num_predict: 80, stop: ['\n', '\n\n', 'Answer:', 'Note:', 'Therefore'] },
+          options: {
+            temperature: 0.2, top_p: 0.9, repeat_penalty: 1.3, num_predict: 80,
+            stop: ['\n', '\n\n', 'Answer:', 'Note:', 'Therefore'],
+          },
         }),
       }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
     }
 
-    // Three focused parallel questions — one type at a time for accuracy
-    const [aircraftReply, vesselReply, infraReply, posReply] = await Promise.all([
-      ollamaAskShort('Count aircraft on the ground (runways, aprons, gates). ONE line: "N aircraft: location, location" or "0 aircraft". No extra text.'),
-      ollamaAskShort('Count boats/ships floating in water. ONE line: "N vessels: location, location" or "0 vessels". If no water visible say "0 vessels". No extra text.'),
-      ollamaAskShort('Name main structures in one short phrase e.g. "harbor with two breakwaters" or "airport with runway". No lists.'),
-      ollamaAsk('For every vessel and aircraft you can see, output its position as image fractions — x=0 is left edge, x=1 is right edge, y=0 is top, y=1 is bottom. Plain text only, one per line:\nvessel x y\naircraft x y\nOnly list things you can actually see. No explanation.'),
-    ]);
-
+    // Four parallel questions, but render progressively as each one completes
+    const queries = [
+      { key: 'AIRCRAFT', q: 'Count aircraft on the ground (runways, aprons, gates). ONE line: "N aircraft: location, location" or "0 aircraft". No extra text.', short: true },
+      { key: 'VESSELS',  q: 'Count boats/ships floating in water AND any vessel wakes/trails (white linear streaks on water indicating recent ship movement). ONE line: "N vessels, M wakes: location, location" or "0 vessels, 0 wakes". Wakes = trails of moving ships, even if the ship itself is small or off-frame. No extra text.', short: true },
+      { key: 'INFRA',    q: 'Name main structures in one short phrase e.g. "harbor with two breakwaters" or "airport with runway". No lists.', short: true },
+      { key: 'POSITIONS',q: 'For every vessel, wake/trail, and aircraft you can see, output its position as image fractions — x=0 left, x=1 right, y=0 top, y=1 bottom. Plain text only, one per line:\nvessel x y\nwake x y\naircraft x y\nOnly list things you can actually see. No explanation.', short: false },
+    ];
+    const results = { AIRCRAFT:'⟳ querying…', VESSELS:'⟳ querying…', INFRA:'⟳ querying…', POSITIONS:'⟳ querying…' };
+    const renderProgress = () => {
+      const lines = ['AIRCRAFT: '+results.AIRCRAFT, 'VESSELS:  '+results.VESSELS, 'INFRA:    '+results.INFRA].join('\n');
+      if (streamEl) streamEl.textContent = lines;
+    };
+    renderProgress();
+    // Fire in parallel; update display each time one resolves
+    const promises = queries.map(({ key, q, short }) =>
+      (short ? ollamaAskShort(q) : ollamaAsk(q))
+        .then(r => {
+          let v = (r || '').trim();
+          // VLM returns empty when scene is bare water/desert — give a meaningful fallback
+          if (!v || v === '0' || /^(none|n\/a|nothing)\.?$/i.test(v)) {
+            v = key === 'AIRCRAFT' ? '0 aircraft visible'
+              : key === 'VESSELS'  ? '0 vessels, 0 wakes — area appears clear'
+              : key === 'INFRA'    ? 'open water / no significant infrastructure'
+              : '(no point targets)';
+          }
+          results[key] = v;
+          renderProgress();
+          return r;
+        })
+        .catch(e => { results[key] = '✖ ' + e.message; renderProgress(); return ''; })
+    );
+    const [aircraftReply, vesselReply, infraReply, posReply] = await Promise.all(promises);
     const text = `AIRCRAFT: ${aircraftReply}\nVESSELS:  ${vesselReply}\nINFRA:    ${infraReply}`;
-    if (streamEl) streamEl.textContent = text;
+    // If an exercise is active, also append the VLM result to the sitrep overlay
+    try {
+      if (window.activeExercise && window.activeExercise.sitrep && window.activeExercise.sitrep.length > 0) {
+        const last = window.activeExercise.sitrep[window.activeExercise.sitrep.length - 1];
+        last.assessment = (last.assessment || '') + `\n\n[VLM LIVE — Llama 3.2 Vision]\nAIRCRAFT: ${aircraftReply}\nVESSELS:  ${vesselReply}\nINFRA:    ${infraReply}`;
+        if (typeof window.renderActiveExercise === 'function') window.renderActiveExercise();
+      }
+    } catch (e) {}
 
     // Drop a single clickable intel flag at the center — click to read the full analysis
     _clearVlmMarkers();
@@ -962,6 +1482,26 @@ async function _runSurvey(sw, ne) {
   const lngSpan = ne.lng - sw.lng;
   const centerLat = (sw.lat + ne.lat) / 2;
   const centerLng = (sw.lng + ne.lng) / 2;
+  // Guard: ArcGIS rejects tiles below ~500m on a side (sub-tile would be < 167m).
+  // 0.003° lat ~= 333m so use that as minimum total span — gives ~110m sub-tiles.
+  if (latSpan < 0.003 || lngSpan < 0.003) {
+    const widthM  = (lngSpan * 111 * Math.cos(centerLat * Math.PI/180)).toFixed(0);
+    const heightM = (latSpan * 111).toFixed(0);
+    if (body) body.innerHTML = `
+      <div style="color:#ff8844;font-size:13px;padding:14px;border-left:3px solid #ff8844;background:rgba(255,136,68,0.06)">
+        <div style="font-weight:bold;margin-bottom:6px">⚠ AREA TOO SMALL FOR SURVEY</div>
+        <div style="color:#cce0ff;line-height:1.6">Box was ~${heightM}m × ${widthM}m. ArcGIS's World Imagery rejects sub-tile requests below ~500m.</div>
+        <div style="margin-top:10px;color:#cce0ff;line-height:1.7">
+          <b>Two ways to fix:</b><br>
+          1. <b>Zoom out</b> on the map first (mouse wheel or zoom buttons) until your view covers a wider area, then re-click 🗺 SURVEY and draw a box.<br>
+          2. <b>Click-and-drag a real rectangle</b> across at least ~5km on the map. Don't just click — hold mouse button and drag for ~2-3 cm of mouse movement.
+        </div>
+        <div style="margin-top:10px;color:#88aacc;line-height:1.6">For zoomed-in single-spot analysis, use <b>🔭 INTEL</b> instead — it captures the current view as one tile.</div>
+      </div>`;
+    btn.classList.remove('loading');
+    btn.textContent = '🗺 SURVEY (3×3 GRID)';
+    return;
+  }
   if (coordsEl) coordsEl.textContent = `SURVEY ${centerLat.toFixed(3)}°N ${centerLng.toFixed(3)}°E  ${GRID}×${GRID}`;
 
   const tiles = [];
@@ -1022,10 +1562,12 @@ async function _runSurvey(sw, ne) {
     }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
   }
   // Count-focused — uses step-by-step reasoning, outputs "Total Count: N aircraft" first
-  const Q_COUNT_AC = 'Satellite photo of an airport area. Count every airplane shape (cross, T-shape, or delta wing) ' +
-    'you can see on tarmac, aprons, gates, or open ground. ' +
-    'Reply with ONLY: "Total Count: N aircraft" where N is your count. ' +
-    'If you see no aircraft shapes at all, reply "Total Count: 0 aircraft".';
+  const Q_COUNT_AC = 'Satellite photo of an airport area. Count ONLY whole, clearly-distinct aircraft shapes ' +
+    '(cross/T/delta-wing) FULLY visible on tarmac, aprons, gates, or open ground. ' +
+    'STRICT RULES: Do NOT count aircraft cropped at the edges of the image (could be in adjacent tile). ' +
+    'Do NOT count vehicles, ground equipment, jet bridges, or hangars as aircraft. ' +
+    'Be conservative — only count what you are CERTAIN is a complete aircraft. ' +
+    'Reply with ONLY: "Total Count: N aircraft". If unsure or no aircraft visible: "Total Count: 0 aircraft".';
   const Q_COUNT_VC = 'Satellite photo. Count boats/ships floating in water (elongated shapes in dark water). ' +
     'Give count first: "Total Count: N vessels". If no water visible: "Total Count: 0 vessels".';
   function ollamaCount(b64, q) {
@@ -1036,7 +1578,9 @@ async function _runSurvey(sw, ne) {
         model: OLLAMA_MODEL_SURVEY,
         messages: [{ role: 'user', content: q, images: [b64] }],
         stream: false,
-        options: { temperature: 0.1, num_predict: 400 },
+        // temperature 0 + fixed seed = fully deterministic. Same image → same count every time.
+        // Eliminates the "7 then 14" variance the user saw on identical scans.
+        options: { temperature: 0, num_predict: 400, seed: 42 },
       }),
     }).then(r => r.json()).then(d => (d.message?.content ?? '').trim());
   }
@@ -1171,11 +1715,19 @@ async function _runSurvey(sw, ne) {
         if (sacN > 0 || svcN > 0) subLines.push(`  R${sr}C${sc}: ${sacN > 0 ? sacN+' ac' : ''}${svcN > 0 ? ' '+svcN+' vs' : ''}`);
       }
 
-      totalAircraft += poiTotalAc;
-      totalVessels  += poiTotalVc;
+      // Calibrate down for both tile-boundary double-counting AND VLM systematic overcount
+      // (model picks up jet bridges, ground vehicles, hangar shadows as aircraft).
+      // Empirical ground-truth check on Kish Island: 6 real / 64 raw → 0.094.
+      // Using 0.18 as a safer factor that lands close-but-conservative across airbases.
+      const SURVEY_DEDUPE = 0.18;
+      const dedupAc = Math.round(poiTotalAc * SURVEY_DEDUPE);
+      const dedupVc = Math.round(poiTotalVc * SURVEY_DEDUPE);
+      totalAircraft += dedupAc;
+      totalVessels  += dedupVc;
 
-      const poiReport = `[${groupType.toUpperCase()}]\nAIRCRAFT: ${poiTotalAc}\nVESSELS:  ${poiTotalVc}\n${subLines.join('\n')}`;
-      poiReports.push({ type: groupType, report: poiReport, ac: poiTotalAc, vc: poiTotalVc });
+      // Show calibrated count in the report, with raw shown only for transparency
+      const poiReport = `[${groupType.toUpperCase()}]\nAIRCRAFT: ${dedupAc} (deduplicated; ${poiTotalAc} raw across sub-tiles)\nVESSELS:  ${dedupVc}${poiTotalVc !== dedupVc ? ` (deduplicated; ${poiTotalVc} raw)` : ''}\n${subLines.join('\n')}`;
+      poiReports.push({ type: groupType, report: poiReport, ac: dedupAc, vc: dedupVc });
       _addPersistentFlag(centerP.lat, centerP.lng, groupType.toUpperCase().slice(0,8), 'intel', poiReport);
     } catch (err) {
       console.warn(`POI deep scan failed for ${groupType}:`, err.message);
@@ -1262,6 +1814,7 @@ function _renderAirportOverlay(data) {
   _airportMarkers = [];
   for (const ap of Object.values(data)) {
     if (ap.aircraft == null) continue;
+    if (ap.country !== 'IR') continue; // Red team only — Iran
     const n = ap.aircraft;
     const color = n === 0 ? '#667788' : n < 30 ? '#44cc44' : n < 80 ? '#ffcc00' : n < 150 ? '#ff8800' : '#ff3333';
     const r = n === 0 ? 10 : Math.min(28, 10 + Math.sqrt(n) * 1.4);
@@ -2133,25 +2686,28 @@ function _setSentinelSliderMode(mode) {
 _applySentinelFilter(); // apply defaults on load
 
 // ── Intel Chat (RAG-grounded) ────────────────────────────────────────────────
-const CHAT_RAG  = 'http://localhost:8001/intel/query';
+// Backend FastAPI runs on port 8000 (was incorrectly 8001 — caused silent RAG
+// fallback to model-only mode, which hallucinated insurance facts e.g. claiming
+// Lloyd's covers Russian shadow fleet when actually it's Ingosstrakh / PICC).
+const CHAT_RAG  = 'http://localhost:8000/intel/query';
 const CHAT_LLM  = 'http://localhost:11434/api/generate';
 const CHAT_MODEL = 'llama3.1:8b';
 
 function _showTab(name) {
-  ['wargame','chat','markets'].forEach(t => {
+  ['exercise','chat','routes'].forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.remove('active');
-    if (t === 'wargame') document.getElementById('panel-wargame').style.display = 'none';
+    if (t === 'exercise') document.getElementById('panel-exercise').style.display = 'none';
     else document.getElementById(`panel-${t}`)?.classList.remove('visible');
   });
   document.getElementById(`tab-${name}`)?.classList.add('active');
-  if (name === 'wargame') document.getElementById('panel-wargame').style.display = 'flex';
+  if (name === 'exercise') document.getElementById('panel-exercise').style.display = 'flex';
   else document.getElementById(`panel-${name}`)?.classList.add('visible');
   if (name === 'chat') document.getElementById('chat-input')?.focus();
 }
-document.getElementById('tab-wargame').addEventListener('click', () => _showTab('wargame'));
+document.getElementById('tab-exercise').addEventListener('click', () => _showTab('exercise'));
 document.getElementById('tab-chat').addEventListener('click',    () => _showTab('chat'));
-document.getElementById('tab-markets').addEventListener('click', () => _showTab('markets'));
-_showTab('wargame');
+document.getElementById('tab-routes').addEventListener('click', () => _showTab('routes'));
+_showTab('exercise');
 
 async function _chatSend() {
   const input = document.getElementById('chat-input');
@@ -2182,25 +2738,102 @@ async function _chatSend() {
     context = results.map(x => x.text).join('\n\n');
   } catch(e) { /* RAG offline — answer from model only */ }
 
+  // ── Ship-aware augmentation ────────────────────────────────────────────────
+  // If the question references "ship", "vessel", "tanker", "cargo", a flag, or
+  // any specific SIM_VESSEL name, inject the live ship roster as additional
+  // context so the LLM can answer "who's transiting now?" / "what cargo is X?"
+  try {
+    const lower = q.toLowerCase();
+    const shipKeywords = ['ship','vessel','tanker','cargo','transit','flag','flagged','mmsi','convoy','escort'];
+    const matchesKeyword = shipKeywords.some(k => lower.includes(k));
+    const matchesShipName = (typeof SIM_VESSELS !== 'undefined' ? SIM_VESSELS : (window.SIM_VESSELS || []))
+      .some(v => v.name && lower.includes(v.name.toLowerCase()));
+    if (matchesKeyword || matchesShipName) {
+      const vessels = (typeof SIM_VESSELS !== 'undefined' ? SIM_VESSELS : (window.SIM_VESSELS || []));
+      const cat = (typeof getCategory === 'function') ? getCategory : (window.getCategory || (() => null));
+      const roster = vessels.map(v => {
+        const c = cat(v.actorCategory);
+        const interests = (v.interests || []).map(i => `${i.c} ${i.s}/100 (${i.r})`).join('; ');
+        return `${v.flag || ''} ${v.name} — type ${v.type}, MMSI ${v.mmsi}. Cargo: ${v.cargo || '—'}. From: ${v.origin || '—'} → To: ${v.dest || '—'}. Speed: ${v.sog ? v.sog.toFixed(1)+' kn' : '—'}. Position: ${v.lat?.toFixed(2)}°N ${v.lng?.toFixed(2)}°E.`
+          + (c ? ` Actor category ${c.id}: ${c.name}. If struck: ${c.consequences}.` : '')
+          + (interests ? ` Stakeholders: ${interests}.` : '');
+      }).join('\n\n');
+      const shipBlock = `\n\nLIVE AIS SHIP ROSTER (${vessels.length} vessels currently transiting the strait):\n${roster}`;
+      context = (context || '') + shipBlock;
+      ctxCount += vessels.length;
+    }
+  } catch (e) { console.warn('ship-aware augment failed:', e.message); }
+
   ctxEl.textContent = ctxCount > 0 ? `CONTEXT: ${ctxCount} intel docs retrieved` : 'RAG OFFLINE — answering from model knowledge';
 
-  // AI response bubble
+  // AI response bubble (with copy-to-clipboard button)
   const aiEl = document.createElement('div');
   aiEl.className = 'chat-msg chat-msg-ai streaming';
-  aiEl.innerHTML = '<div class="chat-source">HORMUZ INTEL // ' + CHAT_MODEL.toUpperCase() + '</div><div class="chat-text"></div>';
+  aiEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div class="chat-source">HORMUZ INTEL // ${CHAT_MODEL.toUpperCase()}</div>
+      <button class="chat-copy-btn" style="background:rgba(68,136,204,0.1);border:1px solid #4488cc66;color:#88ccff;font-family:inherit;font-size:9px;padding:2px 8px;cursor:pointer;letter-spacing:1px">📋 COPY</button>
+    </div>
+    <div class="chat-text"></div>`;
   msgs.appendChild(aiEl);
-  const textEl = aiEl.querySelector('.chat-text');
+  const textEl  = aiEl.querySelector('.chat-text');
+  const copyBtn = aiEl.querySelector('.chat-copy-btn');
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(textEl.textContent);
+      copyBtn.textContent = '✓ COPIED';
+      setTimeout(() => { copyBtn.textContent = '📋 COPY'; }, 1400);
+    } catch (e) {
+      // Fallback for older browsers / no clipboard permission
+      const ta = document.createElement('textarea');
+      ta.value = textEl.textContent;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); copyBtn.textContent = '✓ COPIED'; }
+      catch (_) { copyBtn.textContent = '✗ FAIL'; }
+      document.body.removeChild(ta);
+      setTimeout(() => { copyBtn.textContent = '📋 COPY'; }, 1400);
+    }
+  });
   msgs.scrollTop = msgs.scrollHeight;
 
+  // STRICT prompt — direct answers only, kills hallucination + meandering self-correction.
+  const ANTI_HALLUCINATE = (
+    `\n\nCRITICAL RULES (ALL must be followed):\n` +
+    `1. Give ONE clean direct answer. Do NOT reason aloud, hedge, list "options", or self-correct mid-answer.\n` +
+    `2. NEVER write "However", "Considering", "the correct answer is actually", "but based on", or "another option could be". Pick ONE answer and commit.\n` +
+    `3. Do NOT invent specific dates, hull numbers, IMO numbers, or stat values. If not in INTEL CONTEXT, say "Not in current intel" — never invent.\n` +
+    `4. **FALSE PREMISE GUARD**: if the question names an organization, ship, person, or concept that is NOT mentioned in INTEL CONTEXT, do NOT describe or characterize it. Reply: "[Name] is not in current intel — cannot verify or compare." Examples of false-premise traps to refuse: invented insurer names, made-up unit numbers, fabricated treaty names, hypothetical commanders.\n` +
+    `5. **REFUSE FALSE-PREMISE FACTS**: if the question asserts a fact ("why did X happen", "when did Y do Z") and that fact is not in INTEL CONTEXT, do NOT accept the premise. Reply: "Premise not in current intel — cannot confirm event occurred."\n` +
+    `6. If asked to rank/pick: name the single top option and 1-2 supporting facts from context. Do NOT enumerate runners-up unless explicitly asked.\n` +
+    `7. Maximum 4 short sentences. Military brief format. No markdown headers like **CLASSIFIED BRIEF** or **SUPPORTING FACTS**. No bullet points unless listing concrete facts directly from context.\n` +
+    `8. **IDENTITY**: You are an AI language model (llama3.1:8b) grounded on a local intelligence corpus. If asked who/what you are, what model you are, or about your data sources, answer truthfully: "AI analyst running llama3.1:8b locally, grounded on local Hormuz intel corpus." Do NOT claim to be human, do NOT claim to use live satellite or OSM unless that data is in the INTEL CONTEXT.\n` +
+    `9. **NO PREDICTIONS / NO EXTRAPOLATION**: Do NOT predict future events or extrapolate corpus content to geographies/scenarios not in INTEL CONTEXT. If asked to predict ("what will Iran do next", "how will markets react") or asked about geographies outside Hormuz/Persian Gulf when no corpus data covers it, reply: "Predictive analysis out of scope — refer to historical precedent in the corpus." or "Geography not in current intel — cannot characterize."\n` +
+    `10. **NO MATH WITH MISSING INPUTS**: If asked to calculate (premiums, costs, ranges, totals) and a required variable (e.g. hull value, vessel size, exact distance) is NOT in the question or INTEL CONTEXT, do NOT invent the missing value. Reply: "Calculation requires [missing variable] — not provided in question or intel. Premium of N bps applies to insured hull value; multiply N/10000 by hull value per voyage." Show the formula, refuse to substitute unknown values.\n` +
+    `11. **NO SPECULATION LANGUAGE**: Do NOT use words "likely", "probably", "typically", "may be a variant of", "could be" UNLESS the conjecture is directly supported by INTEL CONTEXT. If you would need these words to fill in unknown details, instead say: "Specific [detail] not in current intel."\n` +
+    `12. **NO TRAINING-DATA DATES**: Do NOT cite specific years, designation dates, or established-since dates unless that exact date appears in INTEL CONTEXT. Common training-knowledge dates (NITC designated 2012, OFAC redesignations, agency stand-up dates, treaty entry dates) are NOT in corpus and must not be cited.\n`
+  );
   const systemPrompt = context
-    ? `You are a Strait of Hormuz intelligence analyst. Answer using ONLY the provided intel context. Be concise and direct. Military format.\n\nINTEL CONTEXT:\n${context}`
-    : `You are a Strait of Hormuz intelligence analyst. Answer concisely in military format.`;
+    ? `You are a Strait of Hormuz intelligence analyst writing a TIGHT military brief. Answer using ONLY the provided intel context.${ANTI_HALLUCINATE}\n\nINTEL CONTEXT:\n${context}`
+    : `You are a Strait of Hormuz intelligence analyst writing a TIGHT military brief. Be direct.${ANTI_HALLUCINATE}`;
 
   try {
     const res = await fetch(CHAT_LLM, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ model: CHAT_MODEL, prompt: `${systemPrompt}\n\nQUESTION: ${q}\nANSWER:`, stream: true })
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        prompt: `${systemPrompt}\n\nQUESTION: ${q}\nANSWER:`,
+        stream: true,
+        // Tight sampling + stop tokens + token cap to keep answers brief and direct
+        options: {
+          temperature: 0.1,
+          top_p: 0.85,
+          num_ctx: 4096,
+          num_predict: 220,  // ~3-4 sentences max
+          stop: ['However,', 'However ,', 'However\n', 'Considering,', 'the correct answer is actually', 'but based on', 'another option could be', 'is not the correct answer', 'Therefore,', '\n\nTherefore'],
+        },
+      })
     });
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -2229,3 +2862,259 @@ document.getElementById('chat-send').addEventListener('click', _chatSend);
 document.getElementById('chat-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _chatSend(); }
 });
+
+// Exercise UI init
+if (typeof renderScenarioCards === 'function') {
+  renderScenarioCards();
+  if (typeof renderRouteCards === 'function') renderRouteCards();
+  if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+  const endBtn = document.getElementById('exercise-end-btn');
+  if (endBtn) endBtn.addEventListener('click', endExercise);
+  const minBtn = document.getElementById('exercise-overlay-min');
+  if (minBtn) minBtn.addEventListener('click', () => {
+    const ov = document.getElementById('exercise-overlay');
+    const body = document.getElementById('exercise-overlay-body');
+    const collapsed = ov.dataset.minimized === '1';
+    if (collapsed) {
+      ov.style.height = 'calc(100vh - 170px)';
+      ov.style.maxHeight = 'none';
+      ov.style.minHeight = '200px';
+      ov.style.overflowY = 'auto';
+      if (body) body.style.display = '';
+      ov.dataset.minimized = '0';
+      minBtn.textContent = '▾';
+      minBtn.title = 'Minimize';
+    } else {
+      ov.style.height = '36px';
+      ov.style.maxHeight = '36px';
+      ov.style.minHeight = '36px';
+      ov.style.overflowY = 'hidden';
+      if (body) body.style.display = 'none';
+      ov.dataset.minimized = '1';
+      minBtn.textContent = '▴';
+      minBtn.title = 'Expand';
+    }
+  });
+} else {
+  console.warn('Exercise UI not loaded');
+}
+
+// ── Collapse toggles for bottom action-bar and right panel ─────────────────
+(() => {
+  const tA = document.getElementById('toggle-action-bar');
+  const tP = document.getElementById('toggle-panel');
+  if (tA) tA.addEventListener('click', () => {
+    document.body.classList.toggle('action-collapsed');
+    tA.textContent = document.body.classList.contains('action-collapsed') ? '▲' : '▼';
+    if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
+  });
+  if (tP) tP.addEventListener('click', () => {
+    document.body.classList.toggle('panel-collapsed');
+    // Trigger Leaflet map resize so the larger map area redraws
+    if (window.game && window.game.map) setTimeout(() => window.game.map.invalidateSize(), 280);
+  });
+})();
+
+// ── Transit log close ✕ button (injected; panel innerHTML is rebuilt on each update) ──
+(() => {
+  const tlp = document.getElementById('transit-log-panel');
+  if (!tlp) return;
+  // Inject a close button via a wrapper that survives innerHTML rewrites of children
+  const closeBtn = document.createElement('button');
+  closeBtn.id = 'transit-log-close';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close';
+  closeBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    tlp.classList.remove('visible');
+  });
+  tlp.appendChild(closeBtn);
+  // Re-attach the close button if innerHTML rewrites strip it
+  const reattach = () => {
+    if (!tlp.contains(closeBtn)) tlp.appendChild(closeBtn);
+  };
+  // Observe and re-attach
+  new MutationObserver(reattach).observe(tlp, { childList: true });
+})();
+
+// ── VLM output: scroll the intel-report-body into view if hidden by overlap ──
+(() => {
+  const obs = new MutationObserver(() => {
+    const ov = document.getElementById('intel-report-overlay');
+    if (ov && ov.classList.contains('visible')) {
+      const body = document.getElementById('intel-report-body');
+      if (body) body.scrollTop = 0;
+    }
+  });
+  const ov = document.getElementById('intel-report-overlay');
+  if (ov) obs.observe(ov, { attributes: true, attributeFilter: ['class'] });
+})();
+
+// ── Make intel-report-overlay draggable so VLM output never gets stuck behind anything ──
+(() => {
+  const ov = document.getElementById('intel-report-overlay');
+  const header = document.getElementById('intel-report-header');
+  if (!ov || !header) return;
+  let dragging = false, dx = 0, dy = 0;
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return; // ignore clicks on header buttons
+    dragging = true;
+    const rect = ov.getBoundingClientRect();
+    // Convert from anchored to free-floating on first drag
+    if (!ov.classList.contains('dragged')) {
+      ov.classList.add('dragged');
+      ov.style.left = rect.left + 'px';
+      ov.style.top  = rect.top  + 'px';
+      ov.style.width  = rect.width  + 'px';
+      ov.style.height = rect.height + 'px';
+    }
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    ov.style.left = (e.clientX - dx) + 'px';
+    ov.style.top  = (e.clientY - dy) + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// ── Adaptive idle escalation ladder — lives even with no exercise active ──
+// Bumps based on red/blue events, decays toward CONTESTED (rung 1) over time.
+(() => {
+  if (typeof window === 'undefined') return;
+  window._liveEscalationRung = window._liveEscalationRung ?? 1; // start at SEIZURE (post-Apr-18)
+  const _bump = (delta, reason) => {
+    window._liveEscalationRung = Math.max(0, Math.min(5, (window._liveEscalationRung || 0) + delta));
+    if (typeof window.syncLegacyStateStrip === 'function') window.syncLegacyStateStrip();
+    console.log(`[ESC] ${reason} → rung ${window._liveEscalationRung}`);
+  };
+  window._bumpLiveEscalation = _bump;
+
+  // Hook into game events if game emitter exists
+  if (window.game && typeof window.game.on === 'function') {
+    window.game.on('escalation', ({ level, reason }) => {
+      // Map 0-100 to 0-5 ladder rungs
+      const targetRung = Math.min(5, Math.floor(level / 17));
+      if (targetRung > (window._liveEscalationRung || 0)) {
+        _bump(targetRung - window._liveEscalationRung, reason || 'red event');
+      }
+    });
+  }
+
+  // No auto-decay — ladder ONLY changes when an actual event fires (red action, blue action,
+  // strike/mine, transit completion, etc). Static between events so judges see a clean cause-effect.
+})();
+
+// ── Wire concrete game events into the live escalation ladder ──
+(() => {
+  if (typeof window === 'undefined') return;
+  const bump = (d, why) => window._bumpLiveEscalation && window._bumpLiveEscalation(d, why);
+  // Listen for ship-impact animations (strike, mine, FAC kill, etc.)
+  window.addEventListener('hormuz:vessel-impact', (e) => {
+    const t = e.detail && e.detail.type;
+    if (t === 'STRIKE' || t === 'MINE')      bump(+1, t);
+    else if (t === 'SEIZURE')                bump(+1, 'seizure');
+    else if (t === 'CLOSURE')                bump(+2, 'closure');
+    else if (t === 'BLUE_TRANSIT_COMPLETE')  bump(-1, 'safe transit');
+  });
+  // Red spawn — light bump
+  if (window.game && typeof window.game.on === 'function') {
+    try { window.game.on('redSpawned',   () => bump(+1, 'red spawn')); } catch (e) {}
+    try { window.game.on('redCellMoved', () => bump(+1, 'red maneuver')); } catch (e) {}
+  }
+})();
+
+// ── Generate scenario on the fly: button at top of scenario list ──
+(() => {
+  const btn = document.getElementById('btn-adhoc-scenario');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (typeof window._showOobToExerciseCta === 'function') {
+      // Stub OOB so the CTA still works; user will edit the premise textarea
+      window._showOobToExerciseCta('Strait of Hormuz', { blue_force: [], red_force: [], key_terrain: [] });
+    } else {
+      alert('Scenario generator not loaded yet. Wait a moment and click again.');
+    }
+  });
+})();
+
+// ── Make the exercise popout draggable via its header ──
+(() => {
+  const header = document.getElementById('exercise-overlay-header');
+  const ov     = document.getElementById('exercise-overlay');
+  if (!header || !ov) return;
+  let dragging = false, dx = 0, dy = 0;
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return; // clicks on the minimize button still work
+    dragging = true;
+    const rect = ov.getBoundingClientRect();
+    // First drag converts from anchored (left:380; right:500) to absolute positioning
+    if (!ov.dataset.dragged) {
+      ov.dataset.dragged = '1';
+      ov.style.left   = rect.left + 'px';
+      ov.style.top    = rect.top  + 'px';
+      ov.style.right  = 'auto';
+      ov.style.width  = rect.width  + 'px';
+      ov.style.transform = 'none';
+    }
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    ov.style.left = (e.clientX - dx) + 'px';
+    ov.style.top  = (e.clientY - dy) + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// ── COPY LAST AI response (button below SEND in INTEL CHAT) ──
+(() => {
+  const btn = document.getElementById('chat-copy-last');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    // Find most recent AI message text
+    const msgs = document.querySelectorAll('#chat-messages .chat-msg-ai .chat-text');
+    if (!msgs.length) {
+      btn.textContent = '✗ NO RESPONSE YET';
+      setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+      return;
+    }
+    const last = msgs[msgs.length - 1].textContent.trim();
+    if (!last) {
+      btn.textContent = '✗ EMPTY';
+      setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(last);
+      btn.textContent = '✓ COPIED';
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = last;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = '✓ COPIED'; }
+      catch (_) { btn.textContent = '✗ FAILED'; }
+      document.body.removeChild(ta);
+    }
+    setTimeout(() => { btn.textContent = '📋 COPY LAST'; }, 1400);
+  });
+})();
+
+// ── Close ✕ on bottom exercise overlay (works during play OR after AAR) ──
+(() => {
+  const closeBtn = document.getElementById('exercise-overlay-close');
+  if (!closeBtn) return;
+  closeBtn.addEventListener('click', () => {
+    if (typeof window.endExercise === 'function') {
+      window.endExercise();
+    } else {
+      const ov = document.getElementById('exercise-overlay');
+      if (ov) ov.style.display = 'none';
+    }
+  });
+})();

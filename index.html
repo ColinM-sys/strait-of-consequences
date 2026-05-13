@@ -48,10 +48,15 @@
       border-top: 1px solid var(--border);
       border-right: 1px solid var(--border);
       display: flex; align-items: center;
-      padding: 0 20px; gap: 10px;
-      z-index: 10;
+      padding: 0 20px; gap: 8px;
+      z-index: 60;
       transition: opacity 0.2s;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
     }
+    #action-bar::-webkit-scrollbar { height: 4px; }
+    #action-bar::-webkit-scrollbar-thumb { background: rgba(68,170,255,0.4); }
     #action-bar.hidden { opacity: 0.3; pointer-events: none; }
     #action-bar-label {
       font-size: 9px; color: var(--dim); letter-spacing: 2px;
@@ -60,10 +65,11 @@
     }
     .action-btn {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 5px; padding: 8px 12px;
+      gap: 4px; padding: 6px 8px;
       border: 1px solid var(--border); background: transparent;
       cursor: pointer; transition: all 0.15s;
-      min-width: 100px; height: 82px;
+      min-width: 84px; height: 82px;
+      flex-shrink: 0;
       font-family: 'Courier New', monospace;
     }
     .action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); border-color: currentColor; }
@@ -76,10 +82,12 @@
     .action-btn.yellow { color: var(--yellow); }
     .action-btn.purple { color: #aa66ff; }
     .action-btn.cyan   { color: #44ffee; }
+    .action-btn.red    { color: #ff5566; }
     #action-hint { flex:1; text-align:center; font-size:11px; color:var(--dim); letter-spacing:1px; line-height:2; }
 
     /* ── D-PAD ─────────────────────────────────────────────────── */
-    #dpad { display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; margin-left:6px; }
+    #dpad { display:none; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; margin-left:6px; }
+    #map-dpad { display:none !important; }
     #dpad-row { display:flex; gap:2px; }
     .dpad-btn {
       width:32px; height:32px; border:1px solid var(--border); background:transparent;
@@ -94,7 +102,7 @@
     /* ── RIGHT PANEL ───────────────────────────────────────────── */
     #panel {
       position: fixed; right: 0; top: 0;
-      width: 340px; height: 100vh;
+      width: 340px; height: calc(100vh - 110px);
       background: var(--panel);
       border-left: 2px solid var(--border);
       display: flex; flex-direction: column;
@@ -107,11 +115,11 @@
     .panel-tab { flex: 1; padding: 8px 4px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--dim); font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; cursor: pointer; transition: all 0.15s; }
     .panel-tab:hover { color: var(--text); }
     .panel-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
-    #panel-wargame { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+    #panel-exercise { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
     #panel-chat { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; padding: 0; }
     #panel-chat.visible { display: flex; }
-    #panel-markets { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
-    #panel-markets.visible { display: flex; }
+    #panel-routes { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; padding: 12px; gap: 10px; }
+    #panel-routes.visible { display: flex; }
     .mkt-header { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-bottom: 2px; }
     .mkt-price { font-size: 28px; letter-spacing: 2px; color: #ffdd55; font-weight: bold; }
     .mkt-sub { font-size: 11px; color: var(--dim); margin-top: 2px; }
@@ -192,7 +200,7 @@
     #coord-copied { font-size: 9px; color: #44cc88; display: none; margin-top: 2px; }
     /* ── TRANSIT COUNTER ───────────────────────────────────── */
     #transit-counter {
-      position: fixed; left: 12px; bottom: 170px; z-index: 5;
+      position: fixed; left: 12px; bottom: 240px; z-index: 5;
       background: rgba(4,10,20,0.88); border: 1px solid var(--border);
       padding: 6px 10px; cursor: pointer; font-size: 10px;
       letter-spacing: 1px; color: var(--dim); transition: all 0.2s;
@@ -213,44 +221,147 @@
     .tr-name { flex: 1; color: var(--text); font-size: 12px; letter-spacing: 0.5px; }
     .tr-time { color: var(--dim); font-size: 11px; flex-shrink: 0; }
 
-    #intel-btn {
-      position: fixed; top: 80px; right: 360px; z-index: 30;
-      background: rgba(6,12,24,0.95); border: 1px solid #aa66ff; color: #aa66ff;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
-    }
-    #intel-btn:hover { background: rgba(170,102,255,0.15); }
-    #intel-btn.loading { opacity: 0.5; cursor: wait; }
+    /* VLM tools — stacked right-edge column, top to bottom: AIR INTEL → SURVEY → INTEL → SENTINEL */
     #airport-intel-btn {
-      position: fixed; top: 80px; right: 516px; z-index: 30;
+      position: fixed; top: 80px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #44ffcc;
-      font-family: inherit; font-size: 12px; letter-spacing: 0.05em;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #airport-intel-btn:hover { background: rgba(68,255,204,0.12); }
-    body.present #airport-intel-btn { right: 596px; }
     .airport-intel-tip { background: rgba(6,12,24,0.95); border: 1px solid #44ffcc; color: #cce8ff; font-family: monospace; font-size: 12px; }
     #survey-btn {
-      position: fixed; top: 80px; right: 430px; z-index: 30;
+      position: fixed; top: 116px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #ffaa44; color: #ffaa44;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #survey-btn:hover { background: rgba(255,170,68,0.15); }
     #survey-btn.loading { opacity: 0.5; cursor: wait; }
-    /* Full-screen intel report viewer */
+    #intel-btn {
+      position: fixed; top: 152px; right: 360px; z-index: 30; min-width: 150px;
+      background: rgba(6,12,24,0.95); border: 1px solid #aa66ff; color: #aa66ff;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
+    }
+    #intel-btn:hover { background: rgba(170,102,255,0.15); }
+    #intel-btn.loading { opacity: 0.5; cursor: wait; }
+    /* Full-screen intel report viewer — sits ABOVE collapsable bars (z-index 70 > action-bar 60) */
     #intel-report-overlay {
       display: none; position: fixed;
       top: 0; left: 0; right: 340px; bottom: 110px;
-      background: rgba(4,6,14,0.97); z-index: 60;
+      background: rgba(4,6,14,0.97); z-index: 70;
       flex-direction: column; font-family: 'Courier New', monospace;
       border-right: 1px solid #aa66ff;
     }
+    body.action-collapsed #intel-report-overlay { bottom: 0; }
+    body.panel-collapsed  #intel-report-overlay { right: 0; }
+    /* Slide every bottom-anchored element down with the action bar */
+    /* exercise-overlay is now a centered popup, so action/panel collapses don't reposition it */
+    body.action-collapsed #legend            { bottom: 14px; }
+    body.action-collapsed #transit-counter   { bottom: 130px; }
+    body.action-collapsed #transit-log-panel { bottom: 110px; }
+
+    /* ── COLLAPSE TOGGLES ─────────────────────────────────────── */
+    #toggle-action-bar {
+      position: fixed; bottom: 110px; right: 348px; z-index: 65;
+      width: 28px; height: 22px; border: 1px solid var(--border);
+      border-bottom: none; background: rgba(4,10,20,0.97); color: var(--blue);
+      font-family: 'Courier New', monospace; font-size: 14px; line-height: 1;
+      cursor: pointer; transition: bottom 0.25s ease, right 0.25s ease;
+    }
+    #toggle-action-bar:hover { color: var(--text); border-color: var(--blue); }
+    body.action-collapsed #action-bar { transform: translateY(120px); }
+    body.action-collapsed #toggle-action-bar { bottom: 0; }
+    body.panel-collapsed  #toggle-action-bar { right: 8px; }
+    #action-bar { transition: transform 0.25s ease; }
+
+    #toggle-panel {
+      position: fixed; top: 12px; right: 348px; z-index: 65;
+      width: 22px; height: 28px; border: 1px solid var(--border);
+      border-right: none; background: rgba(4,10,20,0.97); color: var(--blue);
+      font-family: 'Courier New', monospace; font-size: 14px; line-height: 1;
+      cursor: pointer; transition: right 0.25s ease;
+    }
+    #toggle-panel:hover { color: var(--text); border-color: var(--blue); }
+    body.panel-collapsed #panel { transform: translateX(340px); }
+    body.panel-collapsed #toggle-panel { right: 8px; transform: rotate(180deg); }
+    body.panel-collapsed #map        { width: 100%; }
+    body.panel-collapsed #action-bar { width: 100%; }
+    #panel { transition: transform 0.25s ease; }
+    #map, #action-bar { transition: width 0.25s ease; }
+    /* Right-rail action buttons slide right with the panel so they sit at the new map edge */
+    #intel-btn, #survey-btn, #airport-intel-btn, #sentinel-btn, #btn-present, #btn-tour,
+    #paint-toolbar, #paint-coords, #map-dpad, #transit-counter { transition: transform 0.25s ease; }
+    body.panel-collapsed #intel-btn,
+    body.panel-collapsed #survey-btn,
+    body.panel-collapsed #airport-intel-btn,
+    body.panel-collapsed #sentinel-btn,
+    body.panel-collapsed #btn-present,
+    body.panel-collapsed #btn-tour,
+    body.panel-collapsed #paint-toolbar,
+    body.panel-collapsed #paint-coords,
+    body.panel-collapsed #map-dpad { transform: translateX(340px); }
+    /* Black "bar" residue under collapsed action-bar — kill action-bar's borders so nothing peeks through */
+    body.action-collapsed #action-bar { border-top: none; border-right: none; }
+
+    /* Map extends to full screen height when bottom action bar is collapsed */
+    #map, #action-bar { transition: height 0.25s ease, width 0.25s ease, transform 0.25s ease; }
+    body.action-collapsed #map { height: 100%; }
+
+    /* AIS / vessel popups — cap height so they don't run off-screen */
+    .leaflet-popup-content { max-height: 60vh; overflow-y: auto; max-width: 360px !important; }
+    .ais-popup .leaflet-popup-content-wrapper { max-height: 60vh; }
+
+    /* Ship-cat-sidebar (STRIKE CONSEQUENCES) — shorter when exercise overlay covers bottom */
+    body.exercise-active #ship-cat-sidebar { max-height: 45vh !important; top: 70px !important; }
+
+    /* Wider sidebar while an exercise is active (more room for indicators + decision detail) */
+    body.exercise-active #panel       { width: 480px; }
+    body.exercise-active #map         { width: calc(100% - 480px); }
+    body.exercise-active #action-bar  { width: calc(100% - 480px); }
+    body.exercise-active #intel-report-overlay { right: 480px; }
+    body.exercise-active #toggle-panel  { right: 488px; }
+    body.exercise-active #toggle-action-bar { right: 488px; }
+    /* Right-rail action buttons sit at the new wider panel edge */
+    body.exercise-active #intel-btn,
+    body.exercise-active #survey-btn,
+    body.exercise-active #airport-intel-btn,
+    body.exercise-active #sentinel-btn,
+    body.exercise-active #btn-present,
+    body.exercise-active #btn-tour,
+    body.exercise-active #paint-toolbar,
+    body.exercise-active #paint-coords,
+    body.exercise-active #map-dpad { transform: translateX(-140px); }
+    body.exercise-active.panel-collapsed #panel { transform: translateX(480px); }
+    /* When action bar collapses, the right panel extends to the full bottom */
+    body.action-collapsed #panel { height: 100vh; }
+    #panel { transition: transform 0.25s ease, height 0.25s ease; }
+    body.exercise-active.panel-collapsed #map        { width: 100%; }
+    body.exercise-active.panel-collapsed #action-bar { width: 100%; }
+    body.exercise-active.panel-collapsed #intel-report-overlay { right: 0; }
+
+    /* Close ✕ for transit-log-panel */
+    #transit-log-close {
+      position: absolute; top: 4px; right: 6px; background: none; border: none;
+      color: var(--dim); font-family: 'Courier New', monospace; font-size: 16px;
+      cursor: pointer; padding: 2px 6px; line-height: 1;
+    }
+    #transit-log-close:hover { color: var(--text); }
+
+    /* Make ship-cat-sidebar close button bigger and more visible */
+    #ship-cat-sidebar-close { font-size: 16px !important; padding: 4px 12px !important; font-weight: bold; }
     #intel-report-overlay.visible { display: flex; }
     #intel-report-header {
       flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
       padding: 14px 24px; border-bottom: 1px solid #aa66ff;
       color: #aa66ff; font-size: 12px; letter-spacing: 3px;
+      cursor: move; user-select: none;
+    }
+    #intel-report-header::before { content: '⋮⋮ DRAG '; color: #aa66ff88; margin-right: 6px; font-size: 10px; }
+    /* When dragged, switch from anchored layout to free-floating */
+    #intel-report-overlay.dragged {
+      width: 720px; height: 480px; right: auto; bottom: auto; resize: both; overflow: auto;
     }
     #intel-report-close {
       background: none; border: 1px solid #aa66ff; color: #aa66ff;
@@ -304,10 +415,10 @@
 
     /* ── SENTINEL PANEL ──────────────────────────────────────── */
     #sentinel-btn {
-      position: fixed; top: 112px; right: 360px; z-index: 30;
+      position: fixed; top: 188px; right: 360px; z-index: 30; min-width: 150px;
       background: rgba(6,12,24,0.95); border: 1px solid #33aaff; color: #33aaff;
-      font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
-      padding: 6px 12px; cursor: pointer;
+      font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px;
+      padding: 6px 12px; cursor: pointer; text-align: left;
     }
     #sentinel-btn:hover { background: rgba(51,170,255,0.15); }
     #sentinel-btn.loading { opacity: 0.5; cursor: wait; }
@@ -570,6 +681,7 @@
 
     /* Tour launch button (top bar) */
     #btn-tour {
+      display: none; /* Hidden during active demo work — was overlapping the paint toolbar. Set display:flex to re-enable. */
       position: fixed; top: 12px; right: 360px; z-index: 30;
       background: rgba(6,12,24,0.95); border: 1px solid #ffdd44; color: #ffdd44;
       font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px;
@@ -586,6 +698,20 @@
     .vlm-popup .leaflet-popup-tip { background:#aa66ff !important; }
     .vlm-popup .leaflet-popup-close-button { color:#aa66ff !important; }
     @keyframes spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes keyVesselPulse {
+      0%, 100% { filter: drop-shadow(0 0 3px #ff8800); }
+      50%      { filter: drop-shadow(0 0 14px #ff8800) drop-shadow(0 0 6px #ffaa00); }
+    }
+    .key-vessel-pulse { animation: keyVesselPulse 1.6s ease-in-out infinite; }
+    .damaged-hulk    { filter: grayscale(1) brightness(0.45); }
+    .disabled-ship   { filter: hue-rotate(180deg) brightness(0.7); }
+    .boarded-flash   { animation: boardedFlash 0.6s 4 ease-in-out; }
+    @keyframes boardedFlash { 0%,100% { filter: none; } 50% { filter: drop-shadow(0 0 14px #ff0000); } }
+    @keyframes fxBoom {
+      0%   { transform: scale(0.4); opacity: 0; }
+      30%  { transform: scale(1.4); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: var(--border); }
 
     /* ── STRATEGIC SITUATION PANEL ────────────────────────────── */
@@ -620,9 +746,9 @@
     /* Coalition flags */
     #coalition-bar { padding: 7px 10px; display: flex; align-items: center; gap: 10px; }
     #coalition-label { font-size: 9px; letter-spacing: 1px; color: var(--dim); flex-shrink: 0; }
-    .cflag { font-size: 20px; opacity: 0.15; transition: all 0.5s; cursor: default; filter: grayscale(1); }
+    .cflag { font-size: 20px; opacity: 0.55; transition: all 0.3s; cursor: pointer; filter: grayscale(0.4); }
     .cflag.active { opacity: 1; filter: grayscale(0); }
-    .cflag.hostile { opacity: 1; filter: grayscale(0) hue-rotate(0deg); animation: pulse 1s infinite; }
+    .cflag.hostile { opacity: 1; filter: grayscale(0); border-bottom: 2px solid #ff5566; }
 
     /* ── PRESENTATION MODE ─────────────────────────────────────── */
     #btn-present {
@@ -640,6 +766,7 @@
     body.present #panel          { width: 420px; }
     body.present #map            { width: calc(100% - 420px); }
     body.present #action-bar     { width: calc(100% - 420px); }
+    /* exercise-overlay positioning is set inline (centered popup), no overrides needed */
     body.present #panel-header h1 { font-size: 30px; }
     body.present .subtitle       { font-size: 14px; }
     body.present #turn-num       { font-size: 24px; }
@@ -665,14 +792,11 @@
 <div id="map" tabindex="0"></div>
 <div id="paint-toolbar">
   <button id="btn-paint">✏ PATH</button>
-  <button id="btn-paint-boundary">⬛ LAND</button>
-  <button id="btn-paint-battery">🔴 BATTERY</button>
   <button id="btn-paint-clear">✕ CLEAR</button>
 </div>
-<button id="btn-present" title="Toggle presentation mode for big screen">⛶ PRESENT</button>
 <button id="btn-tour" title="Guided demo tour — walks through all features with explanations">▶ GUIDED TOUR</button>
 <button id="airport-intel-btn" title="Toggle AI aircraft counts at all scanned airports">✈ AIR INTEL</button>
-<button id="survey-btn" title="Draw a box over any area — auto-tiles into 3×3 grid and produces a consolidated report">🗺 SURVEY</button>
+<button id="survey-btn" title="3×3 grid scan for condensed areas — best for high-density targets (airbases, port complexes). Auto-tiles into 9 sub-frames + consolidated report.">🗺 SURVEY (3×3 GRID)</button>
 <button id="intel-btn" title="Capture current map view and analyze with local VLM">🔭 INTEL</button>
 <button id="sentinel-btn" title="Fetch Sentinel-2 satellite passes for this area (last 10 days)">🛰 SENTINEL</button>
 <div id="sentinel-panel">
@@ -763,16 +887,21 @@
 </div>
 <div id="transit-log-panel"></div>
 
-<div id="action-bar" class="hidden">
-  <div id="action-bar-label">ACTIONS</div>
-  <button class="action-btn blue"   id="act-move">       <span class="btn-icon">↗</span><span class="btn-label">MOVE</span>       <span class="btn-cost">click water</span></button>
-  <button class="action-btn yellow" id="act-air-cover" style="display:none">  <span class="btn-icon">✈</span><span class="btn-label">AIR COVER</span>   <span class="btn-cost">2 turns</span></button>
-  <button class="action-btn cyan"   id="act-ciws"      style="display:none">  <span class="btn-icon">⚡</span><span class="btn-label">CIWS</span>        <span class="btn-cost">1 turn</span></button>
-  <button class="action-btn purple" id="act-ew-jam"    style="display:none">  <span class="btn-icon">📡</span><span class="btn-label">EW JAMMING</span> <span class="btn-cost">2 turns</span></button>
-  <button class="action-btn green"  id="act-mine-sweep"style="display:none">  <span class="btn-icon">🔻</span><span class="btn-label">SWEEP MINES</span><span class="btn-cost">10nm</span></button>
-  <button class="action-btn yellow" id="act-airstrike" style="display:none">  <span class="btn-icon">🎯</span><span class="btn-label">AIR STRIKE</span> <span class="btn-cost">click target</span></button>
-  <button class="action-btn purple" id="act-sigint"    style="display:none">  <span class="btn-icon">📻</span><span class="btn-label">KILL RADAR</span> <span class="btn-cost">disables battery</span></button>
-  <div id="action-hint">SELECT A BLUE UNIT<br>CLICK WATER TO MOVE IT</div>
+<button id="toggle-panel" title="Collapse / expand right panel">◀</button>
+<button id="toggle-action-bar" title="Collapse / expand bottom action bar">▼</button>
+<div id="action-bar">
+  <button class="action-btn purple" id="btn-hide-ships"><span class="btn-icon">👁</span><span class="btn-label">HIDE ALL<br>SHIPS</span><span class="btn-cost">clean map</span></button>
+  <button class="action-btn cyan"   id="btn-sim-transit"><span class="btn-icon">⏃</span><span class="btn-label">SIMULATE<br>BLUE TRANSIT</span><span class="btn-cost">DDG west-bound</span></button>
+  <button class="action-btn green"  id="btn-exec-route"><span class="btn-icon">▶</span><span class="btn-label">EXECUTE<br>PAINTED ROUTE</span><span class="btn-cost">tanker + 2 escorts</span></button>
+  <button class="action-btn red"    id="btn-spawn-adv"><span class="btn-icon">🎲</span><span class="btn-label">SPAWN<br>ADVERSARIES</span><span class="btn-cost">Monte-Carlo roll</span></button>
+  <button class="action-btn yellow" id="btn-hist-toggle"><span class="btn-icon">⚠</span><span class="btn-label">MINE / ATTACK<br>HISTORY</span><span class="btn-cost">show on map</span></button>
+  <button class="action-btn purple" id="btn-iran-intel"><span class="btn-icon">📋</span><span class="btn-label">IRGC<br>INTEL PINS</span><span class="btn-cost">VLM-style flags</span></button>
+  <button class="action-btn cyan"   id="btn-osm-infra"><span class="btn-icon">🌐</span><span class="btn-label">OSM<br>INFRASTRUCTURE</span><span class="btn-cost">live OSM data</span></button>
+  <button class="action-btn green"  id="btn-ai-scenario"><span class="btn-icon">🤖</span><span class="btn-label">AI GENERATE<br>SCENARIO</span><span class="btn-cost">Llama 3.1 8B</span></button>
+  <button class="action-btn green"  id="btn-ai-oob"><span class="btn-icon">🛰</span><span class="btn-label">AI GENERATE<br>ORDER OF BATTLE</span><span class="btn-cost">Llama 3.1 8B</span></button>
+  <button class="action-btn cyan"   id="btn-gulf-feed"><span class="btn-icon">📡</span><span class="btn-label">GULF EVENTS<br>FEED</span><span class="btn-cost">ACLED-cached</span></button>
+  <button class="action-btn green"  id="btn-auto-demo"><span class="btn-icon">▶</span><span class="btn-label">AUTO<br>DEMO LOOP</span><span class="btn-cost">hands-free walkthru</span></button>
+  <button class="action-btn yellow" id="btn-reset-all"><span class="btn-icon">🔄</span><span class="btn-label">RESET</span><span class="btn-cost">ships, mines, exercise</span></button>
   <div id="dpad">
     <div id="dpad-row">
       <button class="dpad-btn" id="dp-ul" title="NW">↖</button>
@@ -796,63 +925,66 @@
 <div id="panel">
   <div id="panel-header"><h1>STRAIT OF CONSEQUENCES</h1><div class="subtitle">AI WARGAME // STRAIT OF HORMUZ // 2026</div></div>
   <div id="panel-tabs">
-    <button class="panel-tab active" id="tab-wargame">⚔ WARGAME</button>
+    <button class="panel-tab active" id="tab-exercise">⚠ EXERCISE</button>
     <button class="panel-tab" id="tab-chat">💬 INTEL CHAT</button>
-    <button class="panel-tab" id="tab-markets">📈 MARKETS</button>
+    <button class="panel-tab" id="tab-routes">🚦 ROUTES</button>
   </div>
-  <div id="panel-wargame">
-  <div id="turn-bar"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
-  <div id="strategic-section">
-    <div id="econ-bar">
-      <div class="econ-item">
-        <span class="econ-label">OIL AT RISK</span>
-        <span class="econ-value" id="econ-oil">21%</span>
-        <span class="econ-sub" id="econ-bpd">18.5M BPD</span>
+  <div id="panel-exercise">
+  <!-- Hidden legacy wargame DOM — kept so existing JS handlers don't crash on null. Will be removed once those references are stripped. -->
+  <!-- Always-visible state strip: econ bar + escalation ladder + coalition bar.
+       The other legacy blocks (turn-bar / scenario-section / unit-info / ai-log / controls)
+       stay in the DOM but display:none so existing JS handlers don't crash on null. -->
+  <div id="legacy-wargame-ui">
+    <div id="turn-bar" style="display:none"><span id="turn-label">TURN</span><span id="turn-num">1</span><span id="phase-label" class="player">PLAYER PHASE</span></div>
+    <div id="strategic-section">
+      <div id="econ-bar">
+        <div class="econ-item"><span class="econ-label">OIL AT RISK</span><span class="econ-value" id="econ-oil">21%</span><span class="econ-sub" id="econ-bpd">18.5M BPD</span></div>
+        <div class="econ-item"><span class="econ-label">WAR RISK INS.</span><span class="econ-value" id="econ-insurance">SUSPENDED</span><span class="econ-sub">LLOYD'S APR 18</span></div>
+        <div class="econ-item"><span class="econ-label">IRAN CLOSURE</span><span class="econ-value" id="econ-closure">CLOSED</span><span class="econ-sub">ENFORCED APR 18</span></div>
       </div>
-      <div class="econ-item">
-        <span class="econ-label">WAR RISK INS.</span>
-        <span class="econ-value" id="econ-insurance">SUSPENDED</span>
-        <span class="econ-sub">LLOYD'S APR 18</span>
+      <div id="escalation-ladder">
+        <div id="ladder-header">ESCALATION LADDER</div>
+        <div id="ladder-rungs">
+          <div class="rung current" data-lvl="0">HARASS</div><div class="rung" data-lvl="1">SEIZURE</div><div class="rung" data-lvl="2">MINING</div><div class="rung" data-lvl="3">STRIKE</div><div class="rung" data-lvl="4">CLOSURE</div><div class="rung war" data-lvl="5">WAR</div>
+        </div>
       </div>
-      <div class="econ-item">
-        <span class="econ-label">IRAN CLOSURE</span>
-        <span class="econ-value" id="econ-closure">CLOSED</span>
-        <span class="econ-sub">ENFORCED APR 18</span>
-      </div>
-    </div>
-    <div id="escalation-ladder">
-      <div id="ladder-header">ESCALATION LADDER</div>
-      <div id="ladder-rungs">
-        <div class="rung current" data-lvl="0">HARASS</div>
-        <div class="rung" data-lvl="1">SEIZURE</div>
-        <div class="rung" data-lvl="2">MINING</div>
-        <div class="rung" data-lvl="3">STRIKE</div>
-        <div class="rung" data-lvl="4">CLOSURE</div>
-        <div class="rung war" data-lvl="5">WAR</div>
+      <div id="coalition-bar">
+        <span id="coalition-label">COALITION</span>
+        <span class="cflag" id="cf-uk" title="UK">🇬🇧</span><span class="cflag" id="cf-fr" title="France">🇫🇷</span><span class="cflag" id="cf-sa" title="Saudi">🇸🇦</span><span class="cflag" id="cf-un" title="UN">🇺🇳</span><span class="cflag hostile" id="cf-cn" title="China">🇨🇳</span>
       </div>
     </div>
-    <div id="coalition-bar">
-      <span id="coalition-label">COALITION</span>
-      <span class="cflag" id="cf-uk"  title="UK Royal Navy escorts activated">🇬🇧</span>
-      <span class="cflag" id="cf-fr"  title="France Marine Nationale deploys">🇫🇷</span>
-      <span class="cflag" id="cf-sa"  title="Saudi Arabia pipeline bypass active">🇸🇦</span>
-      <span class="cflag" id="cf-un"  title="UN Security Council emergency session">🇺🇳</span>
-      <span class="cflag hostile" id="cf-cn" title="China demands unimpeded passage">🇨🇳</span>
+    <div id="scenario-section" style="display:none"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
+    <div id="unit-info" style="display:none"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
+    <div id="ai-log" style="display:none"><div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Legacy log.</div></div></div>
+    <div id="controls" style="display:none">
+      <button class="ctrl" id="btn-demo">▶▶ DEMO</button>
+      <div id="demo-progress"></div>
+      <button class="ctrl" id="btn-end-turn">▶ END TURN</button>
+      <button class="ctrl" id="btn-new-scenario">↺ NEW SCENARIO</button>
     </div>
   </div>
-  <div id="scenario-section"><div id="scenario-title">CONNECTING TO AI...</div><div id="scenario-text">Loading scenario engine...</div></div>
-  <div id="unit-info"><div id="unit-name" class="none">— SELECT A BLUE UNIT —</div><div id="unit-stats"></div><div id="move-hint"></div></div>
-  <div id="ai-log">
-    <div class="log-entry system"><div class="log-source">SYSTEM</div><div class="log-text">Click a blue unit to select it, then click anywhere on the water to move it. Hit END TURN to trigger AI adjudication and IRGC response.</div></div>
+  <div id="exercise-tab-body" style="padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1">
+    <div id="exercise-scenario-list">
+      <div style="color:#ff6600;font-size:11px;letter-spacing:2px;margin-bottom:8px">// SELECT SCENARIO //</div>
+      <button id="btn-adhoc-scenario" style="width:100%;margin-bottom:10px;padding:9px;background:rgba(68,255,170,0.10);border:1.5px solid #44ffaa88;color:#44ffaa;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:1.5px;font-weight:bold">⚡ GENERATE SCENARIO ON THE FLY</button>
+      <div id="scenario-cards"></div>
+    </div>
+    <div id="exercise-active" style="display:none">
+      <div id="exercise-brief" style="font-size:12px;line-height:1.5;color:#cce0ff;margin-bottom:10px"></div>
+      <div id="exercise-key-vessels"></div>
+      <div id="exercise-decisions"></div>
+      <button id="exercise-end-btn" style="margin-top:12px;padding:10px;background:rgba(255,80,80,0.18);color:#ff9999;border:1.5px solid #ff5555aa;cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:2px;font-weight:bold">⏹ END EXERCISE NOW</button>
+    </div>
   </div>
-  <div id="controls">
-    <button class="ctrl" id="btn-demo">▶▶ DEMO — WATCH FULL OPERATION</button>
-    <div id="demo-progress"></div>
-    <button class="ctrl" id="btn-end-turn">▶ END TURN / COMMIT MOVES</button>
-    <button class="ctrl" id="btn-new-scenario">↺ GENERATE NEW SCENARIO</button>
-  </div>
-  </div><!-- end #panel-wargame -->
-  <div id="panel-markets">
+  </div><!-- end #panel-exercise -->
+  <div id="panel-routes">
+    <div id="exercise-indicators-strip" style="display:none;border:1px solid #ff660066;padding:10px 12px;background:rgba(255,80,0,0.05);margin-bottom:10px"></div>
+    <div style="color:#88ccff;font-size:11px;letter-spacing:2px;margin-bottom:10px;padding:0 4px">// TRANSIT ROUTE OPTIONS //</div>
+    <div id="route-cards"></div>
+    <div style="color:#7a8896;font-size:10px;line-height:1.5;margin-top:14px;padding:8px 10px;border-top:1px dashed #1a3a5a">
+      Each route is a preset transit + IRGC engagement profile. Click EXECUTE on any card to paint the path and run the formation along it.
+    </div>
+    <details style="margin-top:14px;color:#7a8896;font-size:10px"><summary style="cursor:pointer;letter-spacing:2px;padding:4px 0">▸ LEGACY MARKET DATA</summary><div id="legacy-markets-content">
     <div class="strait-status-bar">
       <div class="strait-status-label">STRAIT OF HORMUZ — CURRENT STATUS</div>
       <div class="strait-status-val">⛔ EFFECTIVELY CLOSED — DUAL NAVAL BLOCKADE ACTIVE</div>
@@ -919,7 +1051,8 @@
         </div>
       </div>
     </div>
-  </div><!-- end #panel-markets -->
+    </div></details>
+  </div><!-- end #panel-routes -->
   <div id="panel-chat">
     <div id="chat-messages">
       <div class="chat-msg chat-msg-ai">
@@ -930,18 +1063,23 @@
     <div id="chat-context-count"></div>
     <div id="chat-input-row">
       <textarea id="chat-input" placeholder="Ask about IRGC capabilities, tanker tactics, escalation..."></textarea>
-      <button id="chat-send">SEND</button>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button id="chat-send">SEND</button>
+        <button id="chat-copy-last" title="Copy the most recent AI response" style="background:rgba(68,136,204,0.12);border:1px solid #4488cc88;color:#88ccff;font-family:'Courier New',monospace;font-size:10px;padding:5px 8px;cursor:pointer;letter-spacing:1px;border-radius:2px">📋 COPY LAST</button>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="map-dpad">
-  <button class="mdp" id="mdp-u">▲</button>
-  <button class="mdp" id="mdp-l">◀</button>
-  <button class="mdp" id="mdp-r">▶</button>
-  <button class="mdp" id="mdp-d">▼</button>
+
+<!-- Ship taxonomy side-panel (slides in on expand-arrow click) -->
+<div id="ship-cat-sidebar" style="display:none;position:fixed;top:80px;left:20px;width:360px;max-height:calc(100vh - 220px);overflow-y:auto;z-index:60;background:rgba(8,16,28,0.97);border:1px solid #ff660066;backdrop-filter:blur(6px);font-family:'Courier New',monospace;color:#cce0ff;padding:14px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.6)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div id="ship-cat-sidebar-title" style="color:#ff8800;font-size:11px;letter-spacing:2px">// STRIKE CONSEQUENCES //</div>
+    <button id="ship-cat-sidebar-close" style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;font-family:inherit;padding:2px 8px">✕</button>
+  </div>
+  <div id="ship-cat-sidebar-body" style="font-size:12px;line-height:1.6"></div>
 </div>
-<div id="map-dpad-label">STEER SHIP</div>
 
 <div id="loading">⬛ AI PROCESSING...</div>
 
@@ -961,6 +1099,103 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=67"></script>
+<!-- ── AI Scenario Generator modal ────────────────────────────────────────────── -->
+<div id="ai-scenario-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.92);z-index:9400;backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;font-family:'Courier New',monospace;overflow-y:auto;padding:20px 20px 40px 20px">
+  <div style="background:#0a1220;border:2px solid #44cc88;border-left:6px solid #44cc88;max-width:760px;width:95%;padding:24px 28px;color:#e0eaf5">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #44cc8844">
+      <div>
+        <div style="color:#44cc88;font-size:11px;letter-spacing:3px;margin-bottom:4px">🤖 AI SCENARIO GENERATOR · LLAMA 3.1 8B (LOCAL)</div>
+        <div style="color:#fff;font-size:16px;font-weight:bold">Type a one-line crisis premise → full 4-turn scenario</div>
+      </div>
+      <button id="ai-scenario-close" style="background:rgba(8,16,28,0.95);border:1px solid #44cc8866;color:#44cc88;padding:6px 12px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px">✕ CLOSE</button>
+    </div>
+    <div style="font-size:11px;color:#88a0b8;margin-bottom:8px;letter-spacing:1.5px">PREMISE</div>
+    <textarea id="ai-scenario-input" placeholder="e.g. IRGC seizes Saudi VLCC near Kharg Island, demands prisoner swap; Brent at 112" rows="3" style="width:100%;background:#060c12;border:1px solid #44cc8866;color:#fff;padding:10px;font-family:'Courier New',monospace;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button id="ai-scenario-generate" style="flex:1;background:#44cc8822;border:1px solid #44cc88;color:#44cc88;padding:10px 14px;cursor:pointer;font-family:'Courier New',monospace;font-size:13px;letter-spacing:1.5px">▶ GENERATE SCENARIO</button>
+    </div>
+    <div id="ai-scenario-status" style="margin-top:14px;font-size:11px;color:#88a0b8;line-height:1.6"></div>
+    <div id="ai-scenario-output" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- ── AI Order of Battle Generator modal ───────────────────────────────────── -->
+<div id="ai-oob-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.92);z-index:9400;backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;font-family:'Courier New',monospace;overflow-y:auto;padding:20px 20px 40px 20px">
+  <div style="background:#0a1220;border:2px solid #66ddff;border-left:6px solid #66ddff;max-width:780px;width:95%;padding:24px 28px;color:#e0eaf5">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #66ddff44">
+      <div>
+        <div style="color:#66ddff;font-size:11px;letter-spacing:3px;margin-bottom:4px">🛰 AI ORDER-OF-BATTLE GENERATOR · LLAMA 3.1 8B</div>
+        <div style="color:#fff;font-size:16px;font-weight:bold">Type a theater → realistic Blue + Red OOB</div>
+      </div>
+      <button id="ai-oob-close" style="background:rgba(8,16,28,0.95);border:1px solid #66ddff66;color:#66ddff;padding:6px 12px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px">✕ CLOSE</button>
+    </div>
+    <div style="font-size:11px;color:#88a0b8;margin-bottom:8px;letter-spacing:1.5px">THEATER</div>
+    <input id="ai-oob-input" placeholder="e.g. Strait of Hormuz / Taiwan Strait / Red Sea / Bab el-Mandeb" style="width:100%;background:#060c12;border:1px solid #66ddff66;color:#fff;padding:10px;font-family:'Courier New',monospace;font-size:13px;box-sizing:border-box">
+    <div style="margin-top:12px"><button id="ai-oob-generate" style="width:100%;background:#66ddff22;border:1px solid #66ddff;color:#66ddff;padding:10px 14px;cursor:pointer;font-family:'Courier New',monospace;font-size:13px;letter-spacing:1.5px">▶ GENERATE ORDER OF BATTLE</button></div>
+    <div id="ai-oob-status" style="margin-top:14px;font-size:11px;color:#88a0b8;line-height:1.6"></div>
+    <div id="ai-oob-output" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- ── Gulf Events Feed modal ──────────────────────────────────────────────── -->
+<div id="gulf-feed-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.92);z-index:9400;backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;font-family:'Courier New',monospace;padding:20px 20px 40px 20px">
+  <div style="background:#0a1220;border:2px solid #44ddff;border-left:6px solid #44ddff;max-width:820px;width:95%;max-height:88vh;overflow-y:auto;padding:24px 28px;color:#e0eaf5">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #44ddff44">
+      <div>
+        <div style="color:#44ddff;font-size:11px;letter-spacing:3px;margin-bottom:4px">📡 GULF REGIONAL EVENTS FEED · ACLED-style cached</div>
+        <div style="color:#fff;font-size:16px;font-weight:bold">Recent Persian Gulf incidents (Apr 2026)</div>
+      </div>
+      <button id="gulf-feed-close" style="background:rgba(8,16,28,0.95);border:1px solid #44ddff66;color:#44ddff;padding:6px 12px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px">✕ CLOSE</button>
+    </div>
+    <div id="gulf-feed-output" style="font-size:11px;line-height:1.6"></div>
+  </div>
+</div>
+
+<!-- ── After-Action Review modal: shows at end of transit ─────────────────────── -->
+<div id="aar-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.92);z-index:9400;backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;font-family:'Courier New',monospace;overflow-y:auto;padding:20px 20px 40px 20px">
+  <div style="background:#0a1220;border:2px solid #44cc88;border-left:6px solid #44cc88;max-width:1200px;width:96%;padding:26px 30px;color:#e0eaf5;box-shadow:0 8px 50px rgba(68,204,136,0.3);max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #44cc8844">
+      <div>
+        <div style="color:#44cc88;font-size:11px;letter-spacing:3px;margin-bottom:4px">📋 AFTER-ACTION REVIEW · CLASSIFICATION: UNCLASSIFIED//FOUO</div>
+        <div id="aar-modal-title" style="color:#fff;font-size:18px;font-weight:bold;letter-spacing:1px"></div>
+      </div>
+      <button id="aar-close" style="background:rgba(8,16,28,0.95);border:1px solid #44cc8866;color:#44cc88;padding:6px 12px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px">✕ CLOSE</button>
+    </div>
+    <div id="aar-modal-body" style="font-size:12px;line-height:1.7"></div>
+  </div>
+</div>
+
+<!-- ── Engagement-response modal: pops on first Red fire during transit ─────── -->
+<div id="response-modal" style="display:none;position:fixed;inset:0;background:rgba(0,4,8,0.85);z-index:9500;backdrop-filter:blur(5px);align-items:center;justify-content:center;font-family:'Courier New',monospace">
+  <div style="background:#0a1220;border:2px solid #ff5566;border-left:6px solid #ff5566;max-width:680px;width:90%;padding:24px 28px;color:#e0eaf5;box-shadow:0 8px 40px rgba(255,85,102,0.4)">
+    <div id="response-modal-title" style="color:#ff5566;font-size:13px;letter-spacing:3px;margin-bottom:8px">🚨 INCOMING ENGAGEMENT — DECISION REQUIRED</div>
+    <div id="response-modal-body" style="font-size:14px;line-height:1.6;margin-bottom:18px;color:#fff"></div>
+    <div style="font-size:10px;letter-spacing:2px;color:#88a0b8;margin-bottom:10px">CHOOSE BLUE RESPONSE</div>
+    <div id="response-modal-options" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div style="font-size:9px;letter-spacing:1.5px;color:#445;margin-top:14px;text-align:right">RED CELL DOCTRINE WILL ADAPT TO YOUR CHOICE</div>
+  </div>
+</div>
+<script src="src/historical-incidents.js?v=222"></script>
+<script src="src/infra-layer.js?v=222"></script>
+<script src="src/ai-features.js?v=230"></script>
+<script src="src/auto-demo.js?v=222"></script>
+<script src="src/ship-taxonomy.js?v=222"></script>
+<script src="src/scenarios.js?v=222"></script>
+<script src="src/routes.js?v=222"></script>
+<script src="src/exercise.js?v=222"></script>
+<script src="src/exercise-ui.js?v=222"></script>
+<script src="src/routes-ui.js?v=222"></script>
+<script type="module" src="src/main.js?v=230"></script>
+<div id="exercise-overlay" style="display:none;position:fixed;top:10vh;left:300px;right:560px;width:auto;z-index:60;background:rgba(0,4,12,0.96);backdrop-filter:blur(8px);border:2px solid #ff6600;border-left:5px solid #ff6600;color:#cce0ff;font-family:'Courier New',monospace;height:auto;max-height:80vh;overflow-y:auto;box-shadow:0 10px 40px rgba(255,102,0,0.25)">
+  <div id="exercise-overlay-header" style="padding:8px 14px;border-bottom:1px solid #ff660033;display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none">
+    <span id="exercise-overlay-title" style="font-size:11px;letter-spacing:2px;color:#ff8800">EXERCISE</span>
+    <span id="exercise-overlay-turn" style="font-size:11px;letter-spacing:2px">TURN 1 OF 4</span>
+    <div style="display:flex;gap:6px">
+      <button id="exercise-overlay-min" title="Minimize" style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;padding:2px 8px;font-family:inherit">▾</button>
+      <button id="exercise-overlay-close" title="Close exercise (end & reset)" style="background:none;border:1px solid #ff660066;color:#ff8800;cursor:pointer;padding:2px 8px;font-family:inherit">✕</button>
+    </div>
+  </div>
+  <div id="exercise-overlay-body" style="padding:10px 14px;font-size:12px"></div>
+</div>
 </body>
 </html>

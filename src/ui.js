@@ -156,11 +156,17 @@ export class UI {
   // ── Log ────────────────────────────────────────────────────────────────────
 
   addLog(source, text, type = 'system') {
+    // Legacy #ai-log is hidden in the exercise-pivot UI. To avoid duplicate "side"
+    // spam during transit/scenario events, drop everything except errors & critical
+    // adjudication. Combat / transit events go to the left-side activity log only.
+    if (type !== 'error' && type !== 'adjudication') return;
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
     entry.innerHTML = `<div class="log-source">${source}</div><div class="log-text">${text}</div>`;
-    this._log.appendChild(entry);
-    this._log.scrollTop = this._log.scrollHeight;
+    if (this._log) {
+      this._log.appendChild(entry);
+      this._log.scrollTop = this._log.scrollHeight;
+    }
   }
 
   showLoading(on) {

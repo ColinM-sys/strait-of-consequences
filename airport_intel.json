@@ -10,7 +10,7 @@
   "OIII": { "name": "Tehran Mehrabad International", "icao": "OIII", "country": "IR", "type": "large_airport", "lat": 35.6892, "lng": 51.3114, "aircraft": 22, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
   "OIIE": { "name": "Imam Khomeini International", "icao": "OIIE", "country": "IR", "type": "large_airport", "lat": 35.4161, "lng": 51.1522, "aircraft": 16, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
   "OIKB": { "name": "Bandar Abbas International", "icao": "OIKB", "country": "IR", "type": "large_airport", "lat": 27.2183, "lng": 56.3778, "aircraft": 8, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
-  "OIBK": { "name": "Kish Island International", "icao": "OIBK", "country": "IR", "type": "medium_airport", "lat": 26.526, "lng": 53.98, "aircraft": 68, "method": "subtile_vlm", "scanned": "2026-04-24T03:00:00Z" },
+  "OIBK": { "name": "Kish Island International", "icao": "OIBK", "country": "IR", "type": "medium_airport", "lat": 26.526, "lng": 53.98, "aircraft": 6, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
   "OIFM": { "name": "Isfahan Shahid Beheshti International", "icao": "OIFM", "country": "IR", "type": "large_airport", "lat": 32.7508, "lng": 51.8613, "aircraft": 14, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
   "OISS": { "name": "Shiraz Shahid Dastghaib International", "icao": "OISS", "country": "IR", "type": "large_airport", "lat": 29.5392, "lng": 52.5897, "aircraft": 10, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
   "OIMM": { "name": "Mashhad International", "icao": "OIMM", "country": "IR", "type": "large_airport", "lat": 36.2352, "lng": 59.6400, "aircraft": 14, "method": "overview", "scanned": "2026-04-24T08:00:00Z" },
